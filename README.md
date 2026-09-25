@@ -1,4 +1,3 @@
-```markdown
 # Zkash
 
 Minimal feed-forward neural networks with **exact parameter budgets**, built for education and reproducible scale studies.
