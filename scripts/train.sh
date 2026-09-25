@@ -2,4 +2,4 @@
 set -e
 cd "$(dirname "$0")/.."
 PYTHONWARNINGS="ignore::FutureWarning" \
-PYTHONPATH=src python -m zkash.train --config configs/zkash_01m.yaml
+PYTHONPATH=src python -m zkash.train --config configs/zkash_1m.yaml
