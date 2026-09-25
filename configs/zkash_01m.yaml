@@ -1,0 +1,21 @@
+model:
+  name: zkash_01m
+  n_in: 64
+  n_out: 8
+  p_drop: 0.1
+
+data:
+  n_samples: 16384          # 4x more data than v1
+  n_classes: 8
+  noise: 0.7
+  seed: 0
+
+train:
+  epochs: 60
+  batch_size: 128
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  seed: 0
+
+paths:
+  checkpoint: checkpoints/zkash01m.pt
