@@ -1,24 +1,24 @@
-# Zkash-0.1M — Technical Whitepaper
+# Zkash-1M — Technical Whitepaper
 
-**Report ID:** ZK-2025-02
-**Version:** 2.0.0
+**Report ID:** ZK-2025-03
+**Version:** 3.0.0
 **Status:** Reference / Educational
-**Params:** exactly 100,000
+**Params:** exactly 1,000,000
 
 ---
 
 ## Abstract
 
-**Zkash-0.1M** is a 4-layer feed-forward neural network with **exactly 100,000 trainable parameters** — a 10× scale-up of the Zkash-10K reference model. It is large enough to exhibit real overfitting, gradient pathologies, and regularization effects, yet small enough to train on a CPU in seconds and to reason about analytically. The parameter count is a hard constraint, not a round-off.
+**Zkash-1M** is a 4-layer feed-forward neural network with **exactly 1,000,000 trainable parameters** — a 10× scale-up of Zkash-0.1M and a 100× scale-up of Zkash-10K. It sits at the low end of "serious" model sizes: large enough to show genuine overfitting, gradient noise, and the benefits of regularization; small enough to train on a CPU and to analyze layer-wise statistics on a laptop. The parameter count is a hard constraint: **1,000,000 exactly**, not one more.
 
 ---
 
 ## 1. Motivation
 
-- **Scale study.** Direct successor to Zkash-10K (v1.0.0, 10,000 params). Same input/output interface, 10× capacity.
-- **Real phenomena.** Unlike the 10K model, Zkash-0.1M can memorize small datasets, exhibit double-descent, and respond measurably to weight decay, dropout, and early stopping.
-- **Still inspectable.** 100,000 parameters is small enough to analyze per-layer spectra, gradient norms, and Hessian approximations on a laptop.
-- **Round number.** An exact budget enables apples-to-apples comparison across optimizers, schedules, and regularization schemes.
+- **Three-order-of-magnitude sweep.** Zkash-10K (v1) → Zkash-0.1M (v2) → Zkash-1M (v3) gives a clean study of how behavior scales across two decades of capacity.
+- **Real overfitting.** At 1M params, the model will overfit a 4k-sample dataset in a few epochs without regularization. This is the first Zkash where regularization is not optional.
+- **Still inspectable.** A 1M-param MLP is small enough to compute full per-layer gradient norms, Jacobian spectra, and Hessian-vector products on CPU.
+- **Round number.** Exact 1M enables fair comparisons across optimizers, schedules, and quantized deployments.
 
 ---
 
@@ -28,16 +28,16 @@
 Input(64)
    │
    ▼
-Linear(64  → 191) + ReLU     # 12,415
+Linear(64  → 508) + ReLU     # 33,020
    │
    ▼
-Linear(191 → 256) + ReLU     # 49,152
+Linear(508 → 640) + ReLU     # 325,760
    │
    ▼
-Linear(256 → 145) + ReLU     # 37,265
+Linear(640 → 988) + ReLU     # 633,308
    │
    ▼
-Linear(145 → 8)              #  1,168
+Linear(988 → 8)              #   7,912
    │
    ▼
 Logits(8) → softmax
@@ -47,18 +47,18 @@ Logits(8) → softmax
 
 | Layer | Shape | Weights | Biases | Total |
 |---|---|---:|---:|---:|
-| `fc1` | Linear(64, 191) | 12,224 | 191 | **12,415** |
-| `fc2` | Linear(191, 256) | 48,896 | 256 | **49,152** |
-| `fc3` | Linear(256, 145) | 37,120 | 145 | **37,265** |
-| `fc4` | Linear(145, 8) | 1,160 | 8 | **1,168** |
-| | | | **Total** | **100,000** |
+| `fc1` | Linear(64, 508) | 32,512 | 508 | **33,020** |
+| `fc2` | Linear(508, 640) | 325,120 | 640 | **325,760** |
+| `fc3` | Linear(640, 988) | 632,320 | 988 | **633,308** |
+| `fc4` | Linear(988, 8) | 7,904 | 8 | **7,912** |
+| | | | **Total** | **1,000,000** |
 
 ### Design notes
 
-- **Two expansion stages, one contraction.** `fc1` expands 64 → 191, `fc2` expands 191 → 256, then `fc3` contracts back to 145, and `fc4` maps to 8 logits. This hourglass shape is deliberate: it forces the network to build a compact class-discriminative representation.
-- **Bias on every layer.** The softmax-redundancy argument (used in v1.0.0) is sacrificed for architectural uniformity and exact parameter accounting.
-- **No normalization layers.** BatchNorm/LayerNorm would add parameters and change the budget. Kept out by design.
-- **Hidden sizes** (191, 256, 145) are the smallest integers that hit exactly 100,000 with a 4-layer all-bias design, subject to `64 · H1 > H1 · H2 > H2 · H3 > H3 · 8` (a rough "smooth funnel" preference).
+- **Expansion → contraction.** First two layers expand (64 → 508 → 640), third expands further (640 → 988) to a wide representation, and the head contracts to 8 logits. The wide `fc3` dominates the budget (63%) and acts as the "learned feature bank".
+- **Bias on every layer.** Unlike v1 (which dropped the output bias), v3 keeps biases everywhere for uniform accounting.
+- **No normalization, no residuals.** Adding these would change the parameter formula. Kept out to preserve the exact 1M budget and the pedagogical simplicity.
+- **Hidden sizes** (508, 640, 988) are the smallest integers satisfying the exact-budget equation subject to `64 < H1 < H2 < H3`. A "monotone funnel then drop" shape.
 
 ---
 
@@ -68,9 +68,9 @@ For input $x \in \mathbb{R}^{64}$:
 
 $$
 \begin{aligned}
-h_1 &= \mathrm{ReLU}(W_1 x + b_1), \quad h_1 \in \mathbb{R}^{191} \\
-h_2 &= \mathrm{ReLU}(W_2 h_1 + b_2), \quad h_2 \in \mathbb{R}^{256} \\
-h_3 &= \mathrm{ReLU}(W_3 h_2 + b_3), \quad h_3 \in \mathbb{R}^{145} \\
+h_1 &= \mathrm{ReLU}(W_1 x + b_1), \quad h_1 \in \mathbb{R}^{508} \\
+h_2 &= \mathrm{ReLU}(W_2 h_1 + b_2), \quad h_2 \in \mathbb{R}^{640} \\
+h_3 &= \mathrm{ReLU}(W_3 h_2 + b_3), \quad h_3 \in \mathbb{R}^{988} \\
 z   &= W_4 h_3 + b_4, \quad z \in \mathbb{R}^{8} \\
 \hat{y} &= \mathrm{softmax}(z)
 \end{aligned}
@@ -86,66 +86,74 @@ $$
 
 ## 4. Training Protocol
 
+At this size, training requires more care than v1/v2.
+
 | Hyperparameter | Value |
 |---|---|
 | Optimizer | AdamW (β = 0.9, 0.999) |
-| Learning rate | 1·10⁻³ (v1.0.0 used 3·10⁻³; larger model → smaller LR) |
-| Weight decay | 1·10⁻⁴ |
-| Batch size | 128 |
-| Epochs | 30–100 |
+| Learning rate | 3·10⁻⁴ |
+| Weight decay | 1·10⁻³ |
+| Batch size | 256 |
+| Epochs | 60–200 |
 | Initialization | Kaiming (ReLU) for hidden, Xavier for output |
 | Loss | Cross-entropy |
+| Dropout | p = 0.2 after `fc2` and `fc3` |
 | Split | 80 / 20 train / val |
 
-Recommended additions over v1.0.0:
+Recommended additions over v2:
 
-- **Dropout** p = 0.1 after `fc2` and `fc3`.
-- **Cosine LR schedule** with warmup.
-- **Early stopping** on val loss (patience 10).
+- **Dropout** p = 0.2 on `fc2` and `fc3`.
+- **Cosine LR schedule with 5-epoch warmup.**
+- **Early stopping** on val loss, patience 15.
+- **Gradient clipping** at norm 1.0 (for stability in early epochs).
 
 ---
 
 ## 5. Characteristics
 
-| Metric | Zkash-10K (v1) | Zkash-0.1M (v2) |
-|---|---:|---:|
-| Trainable parameters | 10,000 | **100,000** |
-| Forward MACs (per sample) | ≈ 20k | ≈ 200k |
-| fp32 size | 40 KB | **≈ 400 KB** |
-| int8 size | 10 KB | 100 KB |
-| Typical val acc (8 Gaussians) | ~1.00 | ~1.00 |
-| Time-to-overfit (N=4,096) | never | < 5 epochs |
-| CPU throughput | > 10k/s | ~2k/s |
+| Metric | Zkash-10K (v1) | Zkash-0.1M (v2) | Zkash-1M (v3) |
+|---|---:|---:|---:|
+| Trainable parameters | 10,000 | 100,000 | **1,000,000** |
+| Forward MACs (per sample) | ≈ 20k | ≈ 200k | ≈ 997,856 |
+| fp32 size | 40 KB | 400 KB | **≈ 4 MB** |
+| int8 size | 10 KB | 100 KB | 1 MB |
+| CPU throughput (batch=256) | > 10k/s | ~2k/s | ~400/s |
+| Time-to-overfit (N=4,096) | never | < 5 epochs | < 2 epochs |
 
 ---
 
 ## 6. Limitations
 
 - Fixed input dimension (64). Not convolutional.
-- Still small by production standards — 0.1M is the low end of "real" models.
-- Can overfit quickly on small datasets; requires regularization to stay useful.
-- Output head is fixed to 8 classes by default (configurable).
+- Still small by production standards — 1M is at the low end of modern models.
+- Overfits aggressively without regularization; val loss will diverge from train loss early without dropout / weight decay.
+- Output head fixed to 8 classes by default (configurable).
 
 ---
 
 ## 7. Extensions
 
-- **Zkash-0.1M-Residual** — add skip connections while preserving the 100,000-param budget.
-- **Zkash-0.1M-Conv** — replace `fc1` with a conv stem for image inputs.
-- **Zkash-0.1M-Quantized** — int8 deployment (100 KB).
-- **Zkash-1M** — next scale-up (v3.0.0).
+- **Zkash-1M-Residual** — add skip connections while preserving the exact 1M budget.
+- **Zkash-1M-Conv** — replace `fc1` with a convolutional stem for image inputs.
+- **Zkash-1M-Quantized** — int8 deployment (1 MB).
+- **Zkash-10M** — next scale-up (v4.0.0).
 
 ---
 
 ## 8. Conclusion
 
-Zkash-0.1M is a 10× scale-up of the Zkash-10K reference, with an exact 100,000-parameter budget. Its uniform 4-layer design, hourglass hidden geometry, and full bias coverage make it a clean testbed for studying overfitting, regularization, and optimization dynamics at the low end of practical model sizes.
+Zkash-1M is the third reference point in the Zkash scaling series, with an exact 1,000,000-parameter budget. At this size, the model exhibits genuine optimization and generalization phenomena — overfitting, gradient noise, sensitivity to learning rate — that are absent at 10K and only marginal at 0.1M. It is the smallest Zkash for which regularization is not a luxury but a necessity.
 
-> *Still small enough to understand, now large enough to misbehave.*
+> *No longer a toy. Still fully inspectable.*
 
 ---
 
 **Citation**
+
+```
+Zkash-1M: A 1,000,000-Parameter Reference Neural Network for Education.
+Technical Report ZK-2025-03, v3.0.0.
+```
 
 ```
 Zkash-0.1M: A 100,000-Parameter Reference Neural Network for Education.
