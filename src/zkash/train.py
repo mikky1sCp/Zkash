@@ -5,24 +5,29 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from .model import Zkash01M as Model
+from .model import build_model
 from .data import make_gaussians, make_loader, split_dataset
-from .utils import count_params, set_seed, load_config
+from .utils import count_params, set_seed, load_config, get_device
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="torch.cuda")
 
 
 def train(cfg: dict) -> None:
     set_seed(cfg["train"]["seed"])
+    device = get_device(cfg["train"].get("device", "auto"))
+    print(f"device: {device}")
 
-    model = Model(
+    model = build_model(
+        cfg["model"]["name"],
         n_in=cfg["model"]["n_in"],
         n_out=cfg["model"]["n_out"],
         p_drop=cfg["model"].get("p_drop", 0.0),
-    )
+    ).to(device)
+
     n = count_params(model)
-    print(f"[Zkash-0.1M] trainable params: {n}")
-    assert n == 100_000, f"expected 100000 params, got {n}"
+    expected = {"zkash_10k": 10_000, "zkash_01m": 100_000, "zkash_1m": 1_000_000}
+    print(f"[{cfg['model']['name']}] trainable params: {n}")
+    assert n == expected[cfg["model"]["name"]], f"got {n}"
 
     # ---- data ----
     ds = make_gaussians(
@@ -51,6 +56,9 @@ def train(cfg: dict) -> None:
         bar = tqdm(train_loader, desc=f"epoch {epoch:3d}", leave=False)
 
         for xb, yb in bar:
+            xb = xb.to(device, non_blocking=True)
+            yb = yb.to(device, non_blocking=True)
+
             opt.zero_grad()
             logits = model(xb)
             loss = loss_fn(logits, yb)
@@ -70,6 +78,8 @@ def train(cfg: dict) -> None:
     correct, seen = 0, 0
     with torch.no_grad():
         for xb, yb in val_loader:
+            xb = xb.to(device, non_blocking=True)
+            yb = yb.to(device, non_blocking=True)
             pred = model(xb).argmax(1)
             correct += (pred == yb).sum().item()
             seen += xb.size(0)
@@ -78,13 +88,16 @@ def train(cfg: dict) -> None:
     # ---- save ----
     ckpt = cfg["paths"]["checkpoint"]
     os.makedirs(os.path.dirname(ckpt), exist_ok=True)
-    torch.save({"model": model.state_dict(), "config": cfg}, ckpt)
+    torch.save({
+        "model": {k: v.cpu() for k, v in model.state_dict().items()},   # сохраняем на CPU
+        "config": cfg,
+    }, ckpt)
     print(f"saved checkpoint → {ckpt}")
 
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--config", default="configs/zkash_01m.yaml")
+    p.add_argument("--config", default="configs/zkash_1m.yaml")
     args = p.parse_args()
     train(load_config(args.config))
 
