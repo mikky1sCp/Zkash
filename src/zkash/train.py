@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from .model import Zkash10K
+from .model import Zkash01M as Model
 from .data import make_gaussians, make_loader, split_dataset
 from .utils import count_params, set_seed, load_config
 
@@ -15,15 +15,14 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="torch.cuda")
 def train(cfg: dict) -> None:
     set_seed(cfg["train"]["seed"])
 
-    model = Zkash10K(
+    model = Model(
         n_in=cfg["model"]["n_in"],
         n_out=cfg["model"]["n_out"],
-        hidden1=cfg["model"]["hidden1"],
-        hidden2=cfg["model"]["hidden2"],
+        p_drop=cfg["model"].get("p_drop", 0.0),
     )
     n = count_params(model)
-    print(f"[Zkash-10K] trainable params: {n}")
-    assert n == 10_000, f"expected 10000 params, got {n}"
+    print(f"[Zkash-0.1M] trainable params: {n}")
+    assert n == 100_000, f"expected 100000 params, got {n}"
 
     # ---- data ----
     ds = make_gaussians(
@@ -85,7 +84,7 @@ def train(cfg: dict) -> None:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--config", default="configs/default.yaml")
+    p.add_argument("--config", default="configs/zkash_01m.yaml")
     args = p.parse_args()
     train(load_config(args.config))
 
