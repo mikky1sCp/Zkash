@@ -36,7 +36,7 @@ PYTHONWARNINGS="ignore::FutureWarning" PYTHONPATH=src \
   python -m zkash.train --config configs/zkash_10m_impossible.yaml
 ```
 
-Future work (v1.1.0) will add early stopping, dropout, and a weight-decay sweep — but the current release intentionally ships **without** them so the failure mode is inspectable.
+Future work (v4.1.0) will add early stopping, dropout, and a weight-decay sweep — but the current release intentionally ships **without** them so the failure mode is inspectable.
 
 ---
 
