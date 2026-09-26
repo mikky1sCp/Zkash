@@ -1,0 +1,6 @@
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch>=2.2
+numpy>=1.26
+pyyaml>=6.0
+tqdm>=4.66
+pytest>=8.0

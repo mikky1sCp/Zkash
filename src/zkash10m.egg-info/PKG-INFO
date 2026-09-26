@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: zkash10m
+Version: 1.0.0
+Summary: Zkash10M: a 10M-parameter residual network for education
+Requires-Python: >=3.10
