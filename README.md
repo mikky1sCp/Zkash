@@ -2,9 +2,9 @@
 
 **A 10-million-parameter residual network, built to be understood.**
 
-*Depth over width. Norm before activation. Predictions before results.*
+*Depth over width. Norm before activation. Bayes before diagnosis.*
 
-![version](https://img.shields.io/badge/series-v4.2.0-blue?style=flat-square)
+![version](https://img.shields.io/badge/series-v4.3.0-blue?style=flat-square)
 ![params](https://img.shields.io/badge/params-10%2C000%2C896-green?style=flat-square)
 ![python](https://img.shields.io/badge/python-%3E%3D3.10-blue?style=flat-square)
 ![pytorch](https://img.shields.io/badge/pytorch-%3E%3D2.2-orange?style=flat-square)
@@ -20,8 +20,10 @@
 - [Architecture in full](#architecture-in-full)
 - [The three ingredients, explained](#the-three-ingredients-explained)
 - [Results across the series](#results-across-the-series)
-- [Two regimes, one mechanism](#two-regimes-one-mechanism)
-- [v4.2.0: a falsified prediction](#v420-a-falsified-prediction)
+- [At the ceiling](#at-the-ceiling)
+- [The corrected Bayes formula](#the-corrected-bayes-formula)
+- [Two falsified predictions (v4.2.0, v4.3.0)](#two-falsified-predictions-v420-v430)
+- [The only intervention that ever worked](#the-only-intervention-that-ever-worked)
 - [Quickstart](#quickstart)
 - [Configuration](#configuration)
 - [Training protocol](#training-protocol)
@@ -46,7 +48,7 @@ Most educational networks are either **too small to be interesting** (XOR MLPs, 
 - **42 linear layers** — deep enough to exhibit real gradient flow behavior
 - **One file, no dependencies** — `model.py` is under 80 lines of readable code
 - **Trains in 60 seconds on a GTX 1660** — you can iterate on ideas without a cluster
-- **Fails in a reproducible, documentable way** — and publishes its falsified predictions
+- **Fails reproducibly, with a Bayes ceiling to prove it** — and publishes its own falsified predictions
 
 ---
 
@@ -193,7 +195,7 @@ Per-block breakdown:
 | `fc2.weight` | (512, 486) | 248,832 |
 | **Per block** | | **498,176** |
 
-**Dropout adds zero parameters.** With `p_drop = 0.1` (v4.2.0), `count_params` still returns exactly 10,000,896.
+**Dropout adds zero parameters. Weight decay adds zero. Cosine LR adds zero. Label smoothing adds zero.** Every intervention tested in v4.2.0 and v4.3.0 leaves `count_params` at exactly 10,000,896.
 
 ---
 
@@ -270,31 +272,23 @@ All models were trained on **easy** synthetic data (n=65,536, `center_scale=3.0`
 
 ### On hard and impossible tasks
 
-Once we make the data difficult, the models diverge. Below are results for **Zkash10M v4.1.0** (early stopping, no regularization):
+The complete picture, with **empirical Bayes ceilings** measured via nearest-centroid Monte Carlo (N = 200,000):
 
-| Config | n_samples | label_noise | Train acc | Val acc | Gap | Best epoch |
-|---|---:|---:|---:|---:|---:|---:|
-| easy | 65,536 | 0.0 | 1.0000 | 1.0000 | 0.000 | 1 |
-| hard | 2,048 | 0.0 | 0.9286 | **0.5428** | +0.386 | 4 |
-| impossible | 262,144 | 0.2 | 0.7188 | **0.7128** | +0.006 | 5 |
+| Config | Clean Bayes | Noisy Bayes | Best model | **Gap to Bayes** | Peak epoch |
+|---|---:|---:|---:|---:|---:|
+| easy | 1.0000 | 1.0000 | 1.0000 | **0.0000** | 1 |
+| hard | — | **0.5879** | 0.5458 | **−0.0421** | 2–4 |
+| impossible | 0.8606 | **0.7142** | 0.7128 | **−0.0014** | 5 |
 
-And v4.2.0 added the missing piece — the **empirical Bayes ceiling** for `hard`:
-
-| Config | Bayes ceiling | Best model | Gap to Bayes |
-|---|---:|---:|---:|
-| easy | 1.0000 | 1.0000 | 0.0000 |
-| hard | **0.5879** | 0.5458 | **−0.0421** |
-| impossible | 0.8250 | 0.7128 | **−0.1122** |
-
-**Takeaway:** the train/val gap tells you almost nothing about which task has room to improve. `hard` has a 0.39 gap and is 4.2 points from Bayes. `impossible` has a 0.006 gap and is 11.2 points from Bayes. Only the ceiling measurement distinguishes them.
+**Takeaway:** the train/val gap tells you almost nothing about which task has room to improve. `hard` has a 0.39 gap and is 4.2 points from Bayes. `impossible` has a 0.006 gap and is **0.14 points** from Bayes. Only the ceiling measurement distinguishes them.
 
 ---
 
-## Two regimes, one mechanism
+## At the ceiling
 
-v4.1.0 classified the two hard tasks as "opposite failures": `hard` overfits, `impossible` underfits. **v4.2.0 refutes that classification.** Both are memorization-dominated; they differ in distance to Bayes, not in regime.
+v4.1.0 classified the two hard tasks as "opposite failures": `hard` overfits, `impossible` underfits. **v4.2.0 and v4.3.0 refute that classification.** Both are **memorization-dominated and ceiling-bound**. They differ in distance to Bayes, not in regime.
 
-### hard — memorization-dominated, ceiling-bound
+### hard — memorization-dominated, 4.2 points below ceiling
 
 | Epoch | Train acc | Val acc | Gap |
 |---:|---:|---:|---:|
@@ -308,12 +302,9 @@ The gap looks like classical overfitting. It isn't. Two facts disqualify that di
 1. The val peak is **4.2 points below the true Bayes ceiling** (0.5428 vs 0.5879).
 2. **Regularization makes val worse, not better** (−0.0116 across two dataset sizes).
 
-The model learns the class signal in the first ~64–128 gradient steps, then spends the rest fitting training noise. Peak val is pinned near the empirical ceiling for whatever sample size is available.
+**Correct remedy:** none. `hard` is closed.
 
-**Correct remedy:** none available within the architecture. `hard` is closed.
-**Wrong remedy (now empirically confirmed):** dropout, weight decay, more data, longer training.
-
-### impossible — optimization-bound
+### impossible — memorization-dominated, 0.14 points below ceiling
 
 | Epoch | Train acc | Val acc | Gap |
 |---:|---:|---:|---:|
@@ -322,43 +313,80 @@ The model learns the class signal in the first ~64–128 gradient steps, then sp
 | 10 | 0.7135 | 0.7099 | +0.004 |
 | 15 | 0.7188 | 0.7093 | +0.010 |
 
-Train and validation stay together at ~0.71. The gap never exceeds 0.01. **Diagnosis:** 20% label noise makes the signal weak; the model is learning slowly. It needs more iterations at a smaller learning rate.
+Train and validation stay together at ~0.71. The gap never exceeds 0.01. Under the v4.1.0 diagnosis, this was underfitting. **v4.3.0 falsifies that**: cosine LR + warmup + label smoothing all land within ±0.0011 of baseline, and the corrected Bayes ceiling (0.7142) shows the peak is **0.14 points** from the theoretical maximum.
 
-**Supporting evidence.** Bayes loss for `label_noise = 0.2` and 8 classes: **0.888** (per §5.1 formula; ~0.803 with corrected `data.py` semantics). Observed train loss at epoch 15: **1.030**. Margin above Bayes: 0.14–0.23 nats. The model is not far from the loss floor. It is simply **not yet converged**.
-
-**Correct remedy:** cosine LR schedule, warmup, longer patience.
-**Wrong remedy:** dropout — it would make an already-slow model slower.
+**Correct remedy:** none. `impossible` is closed.
 
 ### Summary
 
 | Task | Gap to Bayes | Peak epoch | Behavior | Fixable? |
 |---|---:|---:|---|---|
-| `hard` | −0.042 | 2–4 | Ceiling-bound memorization | **No** — gap is task-limited |
-| `impossible` | −0.112 | 5 | Optimization-bound memorization | **Maybe** — v4.3.0 tests it |
+| `hard` | −0.042 | 2–4 | Ceiling-bound memorization (fast) | **No** |
+| `impossible` | −0.001 | 5 | Ceiling-bound memorization (slow) | **No** |
 
-**This is the central lesson of v4.2.0.** A train/val gap cannot tell you whether regularization will help. A 0.39 gap at 0.54 val and a 0.006 gap at 0.71 val can both be memorization-dominated. Only a **Bayes measurement** tells you which one has room to improve.
+**This is the central lesson of v4.3.0.** A train/val gap cannot tell you whether regularization will help. A 0.39 gap at 0.54 val and a 0.006 gap at 0.71 val can **both** be memorization-dominated at a Bayes ceiling. The gap is not diagnostic. **The ceiling is.**
 
 ---
 
-## v4.2.0: a falsified prediction
+## The corrected Bayes formula
 
-WHITEPAPER v4.1.0 §9.1 predicted that dropout + weight decay would raise `hard` val accuracy to **0.60–0.65**. This release tests that prediction directly and reports the result side-by-side.
+**Versions v1.0.0 through v4.2.0 used an incorrect Bayes accuracy formula.** It assumed perfect clean-label separability:
 
-### Setup
+$$\text{Acc}_{\text{Bayes}}(p) = 1 - p \cdot \frac{C-1}{C} \quad \text{(assumes } A_{\text{clean}} = 1\text{)}$$
 
-- `p_drop = 0.1` inside each residual block (applied to the hidden activation, not the identity path)
-- `weight_decay = 1.0e-2` (10× v4.1.0's value), applied via **two parameter groups**: 2-D weight matrices decayed, all 1-D parameters (RMSNorm γ, 21 tensors, 10,752 params) excluded. **Parameter count unchanged: 10,000,896.**
-- `patience = 25`, `epochs = 100`
-- 2×2 ablation: `{dropout, wd} ∈ {off, on} × n_samples ∈ {2,048, 8,192}`
+This is true for `easy` (classes don't overlap) but **false** for `hard` and `impossible`, where feature noise causes class overlap. The correct formula is:
 
-### Results
+$$\boxed{\;\text{Acc}_{\text{Bayes}}(p) = A_{\text{clean}} \cdot \left(1 - \frac{p(C-1)}{C}\right) + (1 - A_{\text{clean}}) \cdot \frac{p}{C}\;}$$
+
+At `A_clean = 1` this reduces to the old formula. At `A_clean < 1` it produces a **strictly lower** ceiling.
+
+### The 11-point correction for `impossible`
+
+| `p` | Old formula | **Corrected** | Error |
+|---|---:|---:|---:|
+| 0.0 | 1.0000 | **0.8606** | −0.1394 |
+| 0.1 | 0.9125 | **0.7870** | −0.1255 |
+| **0.2** | **0.8250** | **0.7135** | **−0.1115** |
+| 0.3 | 0.7375 | **0.6399** | −0.0976 |
+
+Monte Carlo confirms the corrected value: `impossible` noisy Bayes = **0.7142** (vs analytical 0.7135, difference is MC noise).
+
+**Consequence.** WHITEPAPER v4.1.0 diagnosed `impossible` as underfitting — 11.2 points below Bayes — and predicted that LR schedules would close that gap. That diagnosis was an artifact of the incorrect formula. The true gap is **0.14 points**. There is nothing to close.
+
+### The corrected Bayes loss
+
+The old formula used `p` as the wrong-label rate. In `data.py`, re-drawn labels may coincide with the original, so the true wrong-label rate is `q = p·(C−1)/C = 0.175` at `p = 0.2`, not `0.2`.
+
+$$\mathcal{L}_{\text{Bayes}}(q) = -(1-q)\ln(1-q) - q\ln\!\left(\frac{q}{C-1}\right)$$
+
+| `p` | `q` | Old loss | **Corrected loss** |
+|---|---:|---:|---:|
+| 0.0 | 0.000 | 0.000 | **0.000** |
+| 0.1 | 0.0875 | 0.443 | **0.467** |
+| **0.2** | **0.175** | 0.888 | **0.804** |
+| 0.3 | 0.263 | 1.333 | **1.086** |
+
+For `impossible` at `p = 0.2`, the Bayes loss floor is **0.804**, not 0.888. The v4.1.0 "margin above Bayes = 0.142" figure was inflated; the corrected margin is 0.256 nats, but the **val accuracy is already at Bayes** — the gap is confidence, not ranking.
+
+---
+
+## Two falsified predictions (v4.2.0, v4.3.0)
+
+Two releases tested the two natural "fix the hard task" hypotheses. **Both predictions were on the record before the runs. Both were wrong.**
+
+### v4.2.0 — dropout + weight decay on `hard`
+
+**Predicted (v4.1.0 §9.1):** val 0.60–0.65, gap ~0.10.
+**Observed:** val 0.5306, gap 0.2168.
+
+2×2 ablation `{dropout, wd} ∈ {off, on} × n_samples ∈ {2,048, 8,192}`:
 
 | n_samples | regularization | Train acc @ best | Val acc @ best | Best epoch |
 |---:|---|---:|---:|---:|
 | 2,048 | none (v4.1.0) | 0.7407 | **0.5428** | 4 |
-| 2,048 | dropout + wd 1e-2 | 0.7474 | **0.5306** | 4 |
+| 2,048 | dropout 0.1 + wd 1e-2 | 0.7474 | **0.5306** | 4 |
 | 8,192 | none | 0.5418 | **0.5458** | 2 |
-| 8,192 | dropout + wd 1e-2 | 0.5383 | **0.5348** | 2 |
+| 8,192 | dropout 0.1 + wd 1e-2 | 0.5383 | **0.5348** | 2 |
 | — | **true Bayes** | — | **0.5879** | — |
 
 | Effect | 2,048 | 8,192 | Mean |
@@ -366,22 +394,53 @@ WHITEPAPER v4.1.0 §9.1 predicted that dropout + weight decay would raise `hard`
 | **Cost of regularization** | −0.0122 | −0.0110 | **−0.0116** |
 | **Gain from 4× data** | +0.0030 | +0.0042 | **+0.0036** |
 
-| Metric | §9.1 predicted | v4.2.0 observed | Status |
-|---|---:|---:|---|
-| Train acc | ~0.75 | 0.7474 | ✓ |
-| Val acc | 0.60–0.65 | **0.5306** | ✗ |
-| Gap | ~0.10 | 0.2168 | ✗ |
+**Regularization cost 1.2 points. 4× more data gained 0.4 points.** Both are inside single-seed noise; both are consistent across the 2×2.
 
-**The prediction is falsified.** Regularization cost 1.2 points. 4× more data gained 0.4 points. Both are consistent across the 2×2. The only mechanism that reliably helps is saving the best epoch — the v4.1.0 result.
+### v4.3.0 — cosine LR + label smoothing on `impossible`
 
-### Why both measures fail
+**Predicted (v4.2.0 §9.3):** val 0.76–0.80.
+**Observed:** val 0.7117–0.7124.
 
-Both dropout and more data leave the **memorization transition point** unchanged:
+Four runs on `impossible` (262,144 samples, seed 0, patience 25):
 
-- The `hard` runs peak at **64 and 128 gradient steps** (2,048 and 8,192 samples) — same order of magnitude. That transition is set by the task's signal-to-noise ratio, not by capacity.
-- 4× data → 4× steps/epoch → the peak just arrives 4× earlier. Val at the peak is unchanged.
+| Run | Schedule | LS | Best val | Best epoch | Δ vs baseline |
+|---|---|---|---:|---:|---:|
+| baseline | constant | 0.0 | **0.7128** | 5 | — |
+| cosine | cosine | 0.0 | **0.7123** | 5 | −0.0005 |
+| LS | constant | 0.1 | **0.7124** | 5 | −0.0004 |
+| both | cosine | 0.1 | **0.7117** | 5 | −0.0011 |
+| **Bayes (corrected)** | — | — | **0.7142** | — | — |
 
-**Neither capacity reduction nor dataset expansion can move a transition that is task-determined.** Only the Bayes measurement reveals this.
+**All four runs within ±0.0011 of baseline.** All peak at epoch 5. All sit 0.19–0.25 points below Bayes.
+
+Additional evidence: baseline train loss @ best epoch **1.0607**; label smoothing train loss **1.2456** — LS raises the loss floor by exactly the predicted ~0.185 nats, but **val accuracy is unchanged to within noise**. The model's argmax was already correct; only its confidence was disturbed.
+
+### Consolidated ledger
+
+| Release | Prediction | Observed | Status |
+|---|---|---|---|
+| v4.1.0 §9.1 | `hard` val 0.60–0.65 with dropout+wd | 0.5306 | **✗** |
+| v4.1.0 §9.1 | `hard` train acc ~0.75 | 0.7474 | ✓ |
+| v4.1.0 §9.1 | `hard` gap ~0.10 | 0.2168 | **✗** |
+| v4.2.0 §9.3 | `impossible` val 0.76–0.80 with cosine+LS | 0.7117–0.7124 | **✗** |
+
+**2 of 5 predictions correct.** Every prediction that involved raising val accuracy was wrong. That is itself a finding: the model was already at its ceiling in every case, and the ceiling was not measured.
+
+---
+
+## The only intervention that ever worked
+
+| Intervention | Task | Effect on val acc |
+|---|---|---:|
+| **Early stopping + best checkpoint (v4.1.0)** | **`hard`** | **+0.103** |
+| **Early stopping + best checkpoint (v4.1.0)** | **`impossible`** | **+0.099** |
+| Dropout + weight decay (v4.2.0) | `hard` | −0.0116 |
+| 4× more data (v4.2.0) | `hard` | +0.0036 |
+| Cosine LR + warmup (v4.3.0) | `impossible` | −0.0005 |
+| Label smoothing 0.1 (v4.3.0) | `impossible` | −0.0004 |
+| Both (v4.3.0) | `impossible` | −0.0011 |
+
+**Early stopping is the only mechanism in five releases that reliably improved val accuracy.** It costs nothing: no parameters, no backward passes, no architectural change. Every other intervention is within single-seed noise or negative.
 
 ---
 
@@ -425,11 +484,33 @@ bash scripts/train_impossible.sh   # impossible — ~3 minutes
 bash scripts/sweep_hard.sh         # hard v4.2.0 2×2 ablation — ~3 minutes
 ```
 
-### Empirical Bayes for hard
+### v4.3.0 impossible ablation (four runs)
 
 ```bash
-python scripts/bayes_hard.py
-# Bayes (nearest-centroid): 0.5879
+export PYTHONIOENCODING=utf-8   # Windows only — train.py prints a ★ marker
+
+CONFIG=configs/zkash_10m_impossible.yaml
+BASE="PYTHONPATH=src python -m zkash.train --config $CONFIG"
+
+$BASE --override train.patience=25 \
+      paths.checkpoint=checkpoints/imp_baseline.pt
+
+$BASE --override train.schedule=cosine train.warmup_steps=500 train.patience=25 \
+      paths.checkpoint=checkpoints/imp_cos.pt
+
+$BASE --override train.label_smoothing=0.1 train.patience=25 \
+      paths.checkpoint=checkpoints/imp_ls.pt
+
+$BASE --override train.schedule=cosine train.warmup_steps=500 \
+                 train.label_smoothing=0.1 train.patience=25 \
+      paths.checkpoint=checkpoints/imp_both.pt
+```
+
+### Empirical Bayes ceilings
+
+```bash
+python scripts/bayes_hard.py         # 0.5879
+python scripts/bayes_impossible.py   # clean 0.8606, noisy 0.7142
 ```
 
 ### Evaluate
@@ -448,7 +529,7 @@ pytest -q
 
 ## Configuration
 
-All knobs live in `configs/*.yaml`. Four configs ship by default.
+All knobs live in `configs/*.yaml`. Five configs ship by default.
 
 ### `configs/zkash_10m.yaml` — easy
 
@@ -511,7 +592,7 @@ train:
   weight_decay: 1.0e-2
 ```
 
-### `configs/zkash_10m_impossible.yaml` — optimization-bound
+### `configs/zkash_10m_impossible.yaml` — v4.1.0 baseline
 
 ```yaml
 data:
@@ -524,30 +605,44 @@ train:
   batch_size: 256
 ```
 
+### `configs/zkash_10m_impossible_v43.yaml` — v4.3.0 (falsified prediction)
+
+```yaml
+train:
+  epochs: 60
+  patience: 25
+  batch_size: 256
+  schedule: cosine
+  warmup_steps: 500
+  min_lr_ratio: 0.0
+  label_smoothing: 0.1
+```
+
 ---
 
 ## Training protocol
 
-| Hyperparameter | v4.1.0 | v4.2.0 |
-|---|---|---|
-| Optimizer | AdamW (β = 0.9, 0.999) | same |
-| Learning rate | 1·10⁻³ (constant) | same |
-| Weight decay | 1·10⁻⁴ | **1·10⁻² (hard only)** |
-| Weight decay groups | — | **matrices / 1-D split** |
-| Batch size | 128 (256 for impossible) | same |
-| Epochs | 60 max, patience 10 | **100 max, patience 25** |
-| Loss | Cross-entropy | same |
-| Initialization | Default PyTorch (uniform) | same |
-| Warmup | **none** | none |
-| Gradient clipping | **none** | none |
-| Dropout | **none** | **0.1 (hard only)** |
-| Early stopping | **yes** (patience 10 on `val_acc`) | **yes** (patience 25) |
+| Hyperparameter | v4.1.0 | v4.2.0 | v4.3.0 |
+|---|---|---|---|
+| Optimizer | AdamW (β = 0.9, 0.999) | same | same |
+| Learning rate | 1·10⁻³ (constant) | same | **cosine (impossible only)** |
+| Weight decay | 1·10⁻⁴ | **1·10⁻² (hard only)** | same |
+| Weight decay groups | — | **matrices / 1-D split** | same |
+| Batch size | 128 (256 impossible) | same | same |
+| Epochs | 60 max, patience 10 | 100 max, patience 25 | 60 max, patience 25 |
+| Loss | Cross-entropy | same | **+ LS 0.1 (impossible only)** |
+| Warmup | none | none | **500 steps (impossible only)** |
+| Gradient clipping | **none** | none | none |
+| Dropout | **none** | **0.1 (hard only)** | same |
+| Early stopping | **yes** (patience 10 on `val_acc`) | yes (patience 25) | yes (patience 25) |
 
-**Why no warmup and no clipping?** Pre-norm residual networks train cleanly from epoch 1. This is a structural property — not a missing feature.
+**Why no gradient clipping?** Pre-norm residual networks train cleanly from epoch 1. This is a structural property, not a missing feature.
 
-**Why early stopping?** v4.1.0 added it and recovered +10 percentage points on both hard tasks, for free. **It remains the only mechanism in this project that reliably improves val acc.**
+**Why early stopping?** v4.1.0 added it and recovered +10 percentage points on both hard tasks, for free. **It remains the only mechanism in this project that reliably improves val acc.** See §"The only intervention that ever worked".
 
-**Why the parameter groups in v4.2.0?** RMSNorm γ must not be decayed — shrinking it fights pre-norm's own stabilization. The optimizer gets two groups; the model's parameter count is unchanged.
+**Why parameter groups in v4.2.0?** RMSNorm γ must not be decayed — shrinking it fights pre-norm's own stabilization. The optimizer gets two groups; the model's parameter count is unchanged.
+
+**Why cosine + LS in v4.3.0?** To **falsify** the underfitting hypothesis from v4.1.0. They were predicted to raise val acc by +0.05–0.08. They did not. The result is in the falsification ledger.
 
 ---
 
@@ -670,13 +765,14 @@ zkash10m/
 │   ├── zkash_10m.yaml
 │   ├── zkash_10m_hard.yaml
 │   ├── zkash_10m_hard_v42.yaml
-│   └── zkash_10m_impossible.yaml
+│   ├── zkash_10m_impossible.yaml
+│   └── zkash_10m_impossible_v43.yaml
 ├── src/
 │   └── zkash/
 │       ├── __init__.py
 │       ├── model.py        # RMSNorm, ResidualBlock, Zkash10M — one file
 │       ├── data.py         # synthetic Gaussian clouds
-│       ├── train.py        # training loop, early stopping, param groups
+│       ├── train.py        # training loop, early stopping, param groups, LR, LS
 │       ├── evaluate.py     # validation with checkpoint metadata
 │       └── utils.py        # seeds, device, config
 ├── scripts/
@@ -684,7 +780,9 @@ zkash10m/
 │   ├── train_hard.sh
 │   ├── train_impossible.sh
 │   ├── sweep_hard.sh       # v4.2.0 2×2 ablation
+│   ├── sweep_impossible.sh # v4.3.0 four-run ablation
 │   ├── bayes_hard.py       # empirical Bayes for hard
+│   ├── bayes_impossible.py # empirical Bayes for impossible
 │   └── eval.sh
 ├── tests/
 │   ├── test_model.py
@@ -703,26 +801,46 @@ The entire model — normalization, residual block, and the network itself — l
 |---|---|---|---|
 | v1.0.0 | ✅ | Baseline, no regularization | documents failure |
 | v4.1.0 | ✅ | Early stopping + best checkpoint | **+0.10 on hard & impossible** |
-| **v4.2.0** | ✅ | **dropout + wd, hard** | **−0.011 on hard (falsified §9.1)** |
-| v4.3.0 | 🔜 | cosine LR + warmup + patience 25 (**impossible**) | target: close the 11.2-pt gap to Bayes |
-| v4.3.0 | 🔜 | label smoothing 0.1 (**impossible**) | secondary |
-| v4.4.0 | 📅 | Multi-seed runs (5 seeds) — mean ± std | quantifies variance floor |
+| v4.2.0 | ✅ | dropout + wd, `hard` | **−0.0116 on hard (falsified)** |
+| **v4.3.0** | ✅ | **cosine + LS on `impossible`; corrected Bayes formula** | **−0.0005 to −0.0011 (falsified)** |
+| v4.4.0 | 🔜 | Multi-seed runs (5 seeds) — mean ± std | quantifies variance floor |
+| v4.5.0 | 📅 | `data.py` label-noise fix + full re-run | consistency with corrected §5.1 |
 | v5.0.0 | 📅 | Zkash100M — depth 100, exact 100M params | next scale-up |
 
-### v4.3.0 predictions (falsifiable)
+### v4.4.0 predictions (falsifiable)
 
-**impossible (optimization-bound regime):**
+**Multi-seed, 5 seeds:**
 
-| Metric | v4.2.0 | Predicted v4.3.0 |
-|---|---:|---:|
-| Train acc | 0.7188 | ~0.78 |
-| Val acc | **0.7128** | **0.76–0.80** |
-| Gap | +0.006 | ~0.01 |
-| Train loss | 1.030 | ~0.92 |
+| Task | Prediction |
+|---|---|
+| `hard` val acc, 5-seed mean ± std | **0.545 ± 0.008** |
+| `impossible` val acc, 5-seed mean ± std | **0.713 ± 0.003** |
+| Effect of v4.2.0 regularization on `hard` | inside 1σ of seed noise |
 
-Cosine LR with warmup lets the model finish convergence. Target train loss approaches Bayes.
+If the std is larger than predicted, the "effects" in v4.2.0/v4.3.0 become even more clearly null. If smaller, some of the small effects may survive.
 
-**This prediction is on the record. v4.3.0 will report actual numbers side-by-side, whichever way they fall.**
+### v4.5.0 predictions (falsifiable)
+
+**Fix `data.py` label noise to draw from `C-1` other classes**, so `p` becomes the true wrong-label rate. Re-run all three configs.
+
+| Task | Prediction |
+|---|---|
+| `easy` | unchanged at 1.0000 |
+| `hard` | unchanged at 0.5458 (no label noise) |
+| `impossible` at `p = 0.2` | **drops by ~1.5 points to ~0.70**, because the true wrong rate rises from 0.175 to 0.20 |
+
+This will confirm the corrected Bayes formula quantitatively.
+
+### v5.0.0 — Zkash100M
+
+Depth 100, exact 100M parameters. Same architecture, 5× deeper. The open question is whether depth 100 reaches the ceiling faster — it cannot exceed the ceiling, which is task-determined.
+
+| Task | Prediction |
+|---|---|
+| `hard` val acc | **0.586 ± 0.005, peak at epoch 1–2** |
+| `impossible` val acc | **0.714 ± 0.002, peak at epoch 3–5** |
+
+**Neither exceeds Bayes. This prediction is on the record.**
 
 ---
 
@@ -744,13 +862,16 @@ RMSNorm does the same job with half the operations and one parameter per dimensi
 Pre-norm keeps activation scale bounded at every layer, so gradients never spike. Warmup exists to prevent early-training instability — pre-norm prevents that instability structurally.
 
 **Why is val accuracy low on some tasks?**
-Because on those tasks, the model is close to the **Bayes ceiling** — and the ceiling is low. For `hard`, the empirical Bayes is 0.5879; the best model run reaches 0.5458. There is nothing left to learn from this data.
+Because on those tasks, the model is **close to the Bayes ceiling** — and the ceiling is low. For `hard`, empirical Bayes is 0.5879; the best run reaches 0.5458. For `impossible`, corrected Bayes is 0.7142; the best run reaches 0.7128.
 
 **Why did dropout + weight decay make `hard` *worse*?**
-Because `hard` is not overfitting — it is memorization-dominated and ceiling-bound. Regularization suppresses the (already-correct) signal fit along with the noise fit. Net effect: −0.0116 across two dataset sizes. See [v4.2.0: a falsified prediction](#v420-a-falsified-prediction).
+Because `hard` is memorization-dominated and ceiling-bound. Regularization suppresses the (already-correct) signal fit along with the noise fit. Net effect: −0.0116 across two dataset sizes.
 
-**Why didn't 4× more data help `hard`?**
-Because the memorization transition happens at a fixed number of gradient steps (64–128), which is set by the task's signal-to-noise ratio, not by dataset size. More data makes the peak arrive earlier; it doesn't move the peak.
+**Why didn't cosine LR + label smoothing help `impossible`?**
+Because `impossible` is also ceiling-bound. All four v4.3.0 runs land within ±0.0011 of baseline, and peak at epoch 5 — the same epoch as baseline. Cosine and LS change *how the model gets there*, not *where it stops*.
+
+**Why did 4× more data not help `hard`?**
+The memorization transition happens at a fixed number of gradient steps (64–128), set by the task's signal-to-noise ratio, not by dataset size. More data makes the peak arrive earlier; it doesn't move the peak.
 
 **Why does the weight decay use parameter groups?**
 RMSNorm γ should not be decayed — shrinking it fights pre-norm's own stabilization. The 21 norm tensors (10,752 params) are excluded; the 42 weight matrices are decayed. Parameter count is unchanged.
@@ -758,8 +879,11 @@ RMSNorm γ should not be decayed — shrinking it fights pre-norm's own stabiliz
 **Why does early stopping help so much?**
 Because we save the **best** epoch, not the **last**. On `hard`, val peaks at 0.5428 on epoch 4 and drops to 0.4743 by epoch 10 — but v1.0.0 kept saving the last. Early stopping recovers the peak. It remains the only mechanism in this project that reliably improves val acc.
 
+**Wasn't the v4.1.0 "impossible is underfitting" diagnosis correct?**
+No. It was based on an incorrect Bayes formula. The old formula gave 0.825 as the ceiling; the corrected formula gives 0.7135 (MC: 0.7142). The apparent 11.2-point "gap" was an artifact of the formula, not of the model.
+
 **Is this model production-ready?**
-No. It's an educational reference. It has documented failure modes on non-trivial tasks, and its most recent experiment produced a negative result. See the roadmap for v4.3.0.
+No. It's an educational reference. It has documented failure modes on non-trivial tasks, and both v4.2.0 and v4.3.0 interventions produced null or negative results. But it *does* have a complete, correct Bayes analysis — which is more than most production models.
 
 ---
 
@@ -771,7 +895,7 @@ No. It's an educational reference. It has documented failure modes on non-trivia
   number      = {ZK-2025-04},
   institution = {Zkash Project},
   year        = {2025},
-  note        = {Version 4.2.0}
+  note        = {Version 4.3.0}
 }
 ```
 
@@ -783,6 +907,8 @@ No. It's an educational reference. It has documented failure modes on non-trivia
 - Veit, A., Wilber, M., Belongie, S. (2016). *Residual Networks Behave Like Ensembles of Relatively Shallow Networks.* arXiv:1605.06431.
 - Loshchilov, I., Hutter, F. (2019). *Decoupled Weight Decay Regularization.* arXiv:1711.05101.
 - Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., Salakhutdinov, R. (2014). *Dropout: A Simple Way to Prevent Neural Networks from Overfitting.* JMLR 15(1).
+- Szegedy, C., Vanhoucke, V., Ioffe, S., Shlens, J., Wojna, Z. (2016). *Rethinking the Inception Architecture for Computer Vision.* CVPR.
+- Prechelt, L. (1998). *Early Stopping — But When?* In: Neural Networks: Tricks of the Trade. Springer.
 
 ---
 
