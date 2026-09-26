@@ -459,12 +459,12 @@ Because of overfitting. See the [Known limitation](#️-known-limitation--negati
 
 ## Roadmap
 
-- [x] **v1.0.0** — Zkash10M baseline, documented overfitting
-- [ ] **v1.1.0** — early stopping + best checkpoint by val_acc
-- [ ] **v1.2.0** — dropout p=0.1 + weight_decay=1e-2
-- [ ] **v1.3.0** — regularization ablation table (dropout / wd / both)
-- [ ] **v1.4.0** — cosine LR schedule with warmup
-- [ ] **v2.0.0** — Zkash100M
+- [x] **v4.0.0** — Zkash10M baseline, documented overfitting
+- [ ] **v4.1.0** — early stopping + best checkpoint by val_acc
+- [ ] **v4.2.0** — dropout p=0.1 + weight_decay=1e-2
+- [ ] **v4.3.0** — regularization ablation table (dropout / wd / both)
+- [ ] **v4.4.0** — cosine LR schedule with warmup
+- [ ] **v5.0.0** — Zkash100M
 
 ---
 
@@ -476,7 +476,7 @@ Because of overfitting. See the [Known limitation](#️-known-limitation--negati
   number      = {ZK-2025-04},
   institution = {Zkash Project},
   year        = {2025},
-  note        = {Version 1.0.0}
+  note        = {Version 4.0.0}
 }
 ```
 
