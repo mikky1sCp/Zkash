@@ -805,7 +805,7 @@ The entire model — normalization, residual block, and the network itself — l
 | **v4.3.0** | ✅ | **cosine + LS on `impossible`; corrected Bayes formula** | **−0.0005 to −0.0011 (falsified)** |
 | v4.4.0 | 🔜 | Multi-seed runs (5 seeds) — mean ± std | quantifies variance floor |
 | v4.5.0 | 📅 | `data.py` label-noise fix + full re-run | consistency with corrected §5.1 |
-| v5.0.0 | 📅 | Zkash100M — depth 100, exact 100M params | next scale-up |
+| v5.0.0 | 📅 | Zkash50M — depth 50, exact 50M params | next scale-up |
 
 ### v4.4.0 predictions (falsifiable)
 
