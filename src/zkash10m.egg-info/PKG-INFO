@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: zkash10m
+Version: 4.4.0
+Summary: Zkash10M: 10M-parameter residual network with early stopping and multi-seed ablation
+Requires-Python: >=3.10
+License-File: LICENSE
+Dynamic: license-file

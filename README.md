@@ -4,7 +4,7 @@
 
 *Depth over width. Norm before activation. Bayes before diagnosis.*
 
-![version](https://img.shields.io/badge/series-v4.3.0-blue?style=flat-square)
+![version](https://img.shields.io/badge/series-v4.4.0-blue?style=flat-square)
 ![params](https://img.shields.io/badge/params-10%2C000%2C896-green?style=flat-square)
 ![python](https://img.shields.io/badge/python-%3E%3D3.10-blue?style=flat-square)
 ![pytorch](https://img.shields.io/badge/pytorch-%3E%3D2.2-orange?style=flat-square)
@@ -22,7 +22,7 @@
 - [Results across the series](#results-across-the-series)
 - [At the ceiling](#at-the-ceiling)
 - [The corrected Bayes formula](#the-corrected-bayes-formula)
-- [Two falsified predictions (v4.2.0, v4.3.0)](#two-falsified-predictions-v420-v430)
+- [Three falsified predictions (v4.2.0, v4.3.0, v4.4.0)](#three-falsified-predictions-v420-v430-v440)
 - [The only intervention that ever worked](#the-only-intervention-that-ever-worked)
 - [Quickstart](#quickstart)
 - [Configuration](#configuration)
@@ -192,10 +192,10 @@ Per-block breakdown:
 |---|---|---:|
 | `RMSNorm.weight` | (512,) | 512 |
 | `fc1.weight` | (486, 512) | 248,832 |
-| `fc2.weight` | (512, 486) | 248,832 |
+| `fc2.weight` | (486, 512) | 248,832 |
 | **Per block** | | **498,176** |
 
-**Dropout adds zero parameters. Weight decay adds zero. Cosine LR adds zero. Label smoothing adds zero.** Every intervention tested in v4.2.0 and v4.3.0 leaves `count_params` at exactly 10,000,896.
+**Dropout adds zero parameters. Weight decay adds zero. Cosine LR adds zero. Label smoothing adds zero.** Every intervention tested in v4.2.0, v4.3.0, and v4.4.0 leaves `count_params` at exactly 10,000,896.
 
 ---
 
@@ -286,7 +286,7 @@ The complete picture, with **empirical Bayes ceilings** measured via nearest-cen
 
 ## At the ceiling
 
-v4.1.0 classified the two hard tasks as "opposite failures": `hard` overfits, `impossible` underfits. **v4.2.0 and v4.3.0 refute that classification.** Both are **memorization-dominated and ceiling-bound**. They differ in distance to Bayes, not in regime.
+v4.1.0 classified the two hard tasks as "opposite failures": `hard` overfits, `impossible` underfits. **v4.2.0 through v4.4.0 refute that classification.** Both are **memorization-dominated and ceiling-bound**. They differ in distance to Bayes, not in regime.
 
 ### hard — memorization-dominated, 4.2 points below ceiling
 
@@ -297,10 +297,11 @@ v4.1.0 classified the two hard tasks as "opposite failures": `hard` overfits, `i
 | 5 | 0.8188 | 0.4988 | +0.320 |
 | 10 | 0.9286 | 0.4743 | **+0.454** |
 
-The gap looks like classical overfitting. It isn't. Two facts disqualify that diagnosis:
+The gap looks like classical overfitting. It isn't. Three facts disqualify that diagnosis:
 
 1. The val peak is **4.2 points below the true Bayes ceiling** (0.5428 vs 0.5879).
-2. **Regularization makes val worse, not better** (−0.0116 across two dataset sizes).
+2. **Regularization makes val worse, not better** in v4.2.0 (−0.0116) — and, per v4.4.0, is indistinguishable from zero (+0.0059, σ = 0.30).
+3. **4× more data gained only 0.4 points** — inside single-seed noise.
 
 **Correct remedy:** none. `hard` is closed.
 
@@ -313,7 +314,7 @@ The gap looks like classical overfitting. It isn't. Two facts disqualify that di
 | 10 | 0.7135 | 0.7099 | +0.004 |
 | 15 | 0.7188 | 0.7093 | +0.010 |
 
-Train and validation stay together at ~0.71. The gap never exceeds 0.01. Under the v4.1.0 diagnosis, this was underfitting. **v4.3.0 falsifies that**: cosine LR + warmup + label smoothing all land within ±0.0011 of baseline, and the corrected Bayes ceiling (0.7142) shows the peak is **0.14 points** from the theoretical maximum.
+Train and validation stay together at ~0.71. The gap never exceeds 0.01. Under the v4.1.0 diagnosis, this was underfitting. **v4.3.0 and v4.4.0 falsify that**: cosine LR + warmup + label smoothing all land within ±0.0004 (σ < 0.20) of baseline, and the corrected Bayes ceiling (0.7142) shows the peak is **0.14 points** from the theoretical maximum.
 
 **Correct remedy:** none. `impossible` is closed.
 
@@ -324,7 +325,7 @@ Train and validation stay together at ~0.71. The gap never exceeds 0.01. Under t
 | `hard` | −0.042 | 2–4 | Ceiling-bound memorization (fast) | **No** |
 | `impossible` | −0.001 | 5 | Ceiling-bound memorization (slow) | **No** |
 
-**This is the central lesson of v4.3.0.** A train/val gap cannot tell you whether regularization will help. A 0.39 gap at 0.54 val and a 0.006 gap at 0.71 val can **both** be memorization-dominated at a Bayes ceiling. The gap is not diagnostic. **The ceiling is.**
+**This is the central lesson of v4.3.0 and v4.4.0.** A train/val gap cannot tell you whether regularization will help. A 0.39 gap at 0.54 val and a 0.006 gap at 0.71 val can **both** be memorization-dominated at a Bayes ceiling. The gap is not diagnostic. **The ceiling is.**
 
 ---
 
@@ -370,14 +371,14 @@ For `impossible` at `p = 0.2`, the Bayes loss floor is **0.804**, not 0.888. The
 
 ---
 
-## Two falsified predictions (v4.2.0, v4.3.0)
+## Three falsified predictions (v4.2.0, v4.3.0, v4.4.0)
 
-Two releases tested the two natural "fix the hard task" hypotheses. **Both predictions were on the record before the runs. Both were wrong.**
+Three releases tested the "fix the hard task" hypotheses. **All predictions were on the record before the runs. All were wrong** — the first two outright, the third (v4.4.0) in its predicted magnitude.
 
-### v4.2.0 — dropout + weight decay on `hard`
+### v4.2.0 — dropout + weight decay on `hard` (single seed)
 
 **Predicted (v4.1.0 §9.1):** val 0.60–0.65, gap ~0.10.
-**Observed:** val 0.5306, gap 0.2168.
+**Observed (seed 0):** val 0.5306, gap 0.2168.
 
 2×2 ablation `{dropout, wd} ∈ {off, on} × n_samples ∈ {2,048, 8,192}`:
 
@@ -394,12 +395,12 @@ Two releases tested the two natural "fix the hard task" hypotheses. **Both predi
 | **Cost of regularization** | −0.0122 | −0.0110 | **−0.0116** |
 | **Gain from 4× data** | +0.0030 | +0.0042 | **+0.0036** |
 
-**Regularization cost 1.2 points. 4× more data gained 0.4 points.** Both are inside single-seed noise; both are consistent across the 2×2.
+**Regularization cost 1.2 points. 4× more data gained 0.4 points.** Both were presented as real, but as v4.4.0 will show, both were single-seed noise.
 
-### v4.3.0 — cosine LR + label smoothing on `impossible`
+### v4.3.0 — cosine LR + label smoothing on `impossible` (single seed)
 
 **Predicted (v4.2.0 §9.3):** val 0.76–0.80.
-**Observed:** val 0.7117–0.7124.
+**Observed (seed 0):** val 0.7117–0.7124.
 
 Four runs on `impossible` (262,144 samples, seed 0, patience 25):
 
@@ -413,7 +414,26 @@ Four runs on `impossible` (262,144 samples, seed 0, patience 25):
 
 **All four runs within ±0.0011 of baseline.** All peak at epoch 5. All sit 0.19–0.25 points below Bayes.
 
-Additional evidence: baseline train loss @ best epoch **1.0607**; label smoothing train loss **1.2456** — LS raises the loss floor by exactly the predicted ~0.185 nats, but **val accuracy is unchanged to within noise**. The model's argmax was already correct; only its confidence was disturbed.
+### v4.4.0 — multi-seed (5 seeds) on both tasks
+
+Every result in v1.0.0–v4.3.0 was single-seed (seed 0). v4.4.0 re-runs the v4.2.0 and v4.3.0 ablations on **5 seeds each** (0–4) and reports mean ± std on `val_acc`.
+
+| Task | Config | val acc (5 seeds) | Δ vs baseline | σ | Verdict |
+|---|---|---:|---:|---:|---|
+| `hard` | baseline | 0.5306 ± 0.0143 | — | — | — |
+| `hard` | v4.2.0 (dropout 0.1 + wd 1e-2) | 0.5364 ± 0.0132 | **+0.0059** | **0.30** | within 1σ |
+| `impossible` | baseline | 0.7102 ± 0.0018 | — | — | — |
+| `impossible` | cosine + warmup 500 | 0.7100 ± 0.0015 | **−0.0002** | **0.10** | within 1σ |
+| `impossible` | label smoothing 0.1 | 0.7102 ± 0.0017 | **−0.0001** | **0.02** | within 1σ |
+| `impossible` | both | 0.7098 ± 0.0014 | **−0.0004** | **0.19** | within 1σ |
+
+**Three findings.**
+
+**(a) Every effect collapses to zero.** Three of the four multi-seed deltas sit at σ < 0.20. None reaches 1σ. The single-seed "effects" of v4.2.0 (−0.0116) and v4.3.0 (−0.0005 to −0.0011) were artifacts of sampling seed 0 — the sign of `hard`'s delta even flips.
+
+**(b) Seed variance was mispredicted by ~1.8× in both directions.** Predicted (v4.3.0 §9.3): `hard` 0.008, `impossible` 0.003. Observed: `hard` **0.0143**, `impossible` **0.0018**. Even the variance floor is harder to guess than the mean.
+
+**(c) Cosine compresses the peak-epoch distribution without moving val acc.** Baseline `best epoch` = 7.0 ± 3.54 (range 3–12). Cosine `best epoch` = 4.4 ± 1.14 (range 3–6). The schedule changes *when* the peak arrives, not *where* it lands. This is the only non-null effect of any training-loop change in four releases, and it is not an accuracy effect.
 
 ### Consolidated ledger
 
@@ -423,8 +443,11 @@ Additional evidence: baseline train loss @ best epoch **1.0607**; label smoothin
 | v4.1.0 §9.1 | `hard` train acc ~0.75 | 0.7474 | ✓ |
 | v4.1.0 §9.1 | `hard` gap ~0.10 | 0.2168 | **✗** |
 | v4.2.0 §9.3 | `impossible` val 0.76–0.80 with cosine+LS | 0.7117–0.7124 | **✗** |
+| v4.3.0 §9.3 | `hard` std = 0.008 | 0.0143 | **✗** |
+| v4.3.0 §9.3 | `impossible` std = 0.003 | 0.0018 | **✗** |
+| v4.4.0 | All v4.2.0/v4.3.0 effects null on 5 seeds | confirmed | ✓ |
 
-**2 of 5 predictions correct.** Every prediction that involved raising val accuracy was wrong. That is itself a finding: the model was already at its ceiling in every case, and the ceiling was not measured.
+**6 of 7 predictions wrong.** Every prediction involving either raising val accuracy or guessing the variance floor was wrong. That is itself a finding: the model was already at its ceiling in every case, and the ceiling — like the variance — was not measured.
 
 ---
 
@@ -434,13 +457,17 @@ Additional evidence: baseline train loss @ best epoch **1.0607**; label smoothin
 |---|---|---:|
 | **Early stopping + best checkpoint (v4.1.0)** | **`hard`** | **+0.103** |
 | **Early stopping + best checkpoint (v4.1.0)** | **`impossible`** | **+0.099** |
-| Dropout + weight decay (v4.2.0) | `hard` | −0.0116 |
+| Dropout + weight decay (v4.2.0, single seed) | `hard` | −0.0116 |
+| Dropout + weight decay (v4.4.0, 5 seeds) | `hard` | +0.0059 (σ = 0.30) |
 | 4× more data (v4.2.0) | `hard` | +0.0036 |
-| Cosine LR + warmup (v4.3.0) | `impossible` | −0.0005 |
-| Label smoothing 0.1 (v4.3.0) | `impossible` | −0.0004 |
-| Both (v4.3.0) | `impossible` | −0.0011 |
+| Cosine LR + warmup (v4.3.0, single seed) | `impossible` | −0.0005 |
+| Cosine LR + warmup (v4.4.0, 5 seeds) | `impossible` | −0.0002 (σ = 0.10) |
+| Label smoothing 0.1 (v4.3.0, single seed) | `impossible` | −0.0004 |
+| Label smoothing 0.1 (v4.4.0, 5 seeds) | `impossible` | −0.0001 (σ = 0.02) |
+| Both (v4.3.0, single seed) | `impossible` | −0.0011 |
+| Both (v4.4.0, 5 seeds) | `impossible` | −0.0004 (σ = 0.19) |
 
-**Early stopping is the only mechanism in five releases that reliably improved val accuracy.** It costs nothing: no parameters, no backward passes, no architectural change. Every other intervention is within single-seed noise or negative.
+**Early stopping is the only mechanism in five releases that reliably improved val accuracy.** It costs nothing: no parameters, no backward passes, no architectural change. Every other intervention is within single-seed noise or negative — and v4.4.0 shows the "single-seed noise" was larger than v4.2.0/v4.3.0 assumed.
 
 ---
 
@@ -484,7 +511,7 @@ bash scripts/train_impossible.sh   # impossible — ~3 minutes
 bash scripts/sweep_hard.sh         # hard v4.2.0 2×2 ablation — ~3 minutes
 ```
 
-### v4.3.0 impossible ablation (four runs)
+### v4.3.0 impossible ablation (four runs, single seed)
 
 ```bash
 export PYTHONIOENCODING=utf-8   # Windows only — train.py prints a ★ marker
@@ -504,6 +531,21 @@ $BASE --override train.label_smoothing=0.1 train.patience=25 \
 $BASE --override train.schedule=cosine train.warmup_steps=500 \
                  train.label_smoothing=0.1 train.patience=25 \
       paths.checkpoint=checkpoints/imp_both.pt
+```
+
+### v4.4.0 multi-seed (5 seeds)
+
+```bash
+# hard — 2 configs × 5 seeds, ~2 min total
+bash scripts/multiseed_hard.sh
+
+# impossible — 4 configs × 5 seeds, ~1 h total
+bash scripts/multiseed_impossible.sh
+
+# compare reports
+PYTHONPATH=src python -m zkash.compare \
+  logs/multiseed_hard_baseline.json \
+  logs/multiseed_hard_v42_regularized.json
 ```
 
 ### Empirical Bayes ceilings
@@ -559,6 +601,7 @@ train:
   lr: 1.0e-3
   weight_decay: 1.0e-4
   seed: 0
+  schedule: constant
 
 paths:
   checkpoint: checkpoints/zkash10m.pt
@@ -574,7 +617,7 @@ data:
   label_noise: 0.0
 ```
 
-### `configs/zkash_10m_hard_v42.yaml` — v4.2.0 (falsified prediction)
+### `configs/zkash_10m_hard_v42.yaml` — v4.2.0 (falsified)
 
 ```yaml
 model:
@@ -605,7 +648,7 @@ train:
   batch_size: 256
 ```
 
-### `configs/zkash_10m_impossible_v43.yaml` — v4.3.0 (falsified prediction)
+### `configs/zkash_10m_impossible_v43.yaml` — v4.3.0 (falsified)
 
 ```yaml
 train:
@@ -622,27 +665,30 @@ train:
 
 ## Training protocol
 
-| Hyperparameter | v4.1.0 | v4.2.0 | v4.3.0 |
-|---|---|---|---|
-| Optimizer | AdamW (β = 0.9, 0.999) | same | same |
-| Learning rate | 1·10⁻³ (constant) | same | **cosine (impossible only)** |
-| Weight decay | 1·10⁻⁴ | **1·10⁻² (hard only)** | same |
-| Weight decay groups | — | **matrices / 1-D split** | same |
-| Batch size | 128 (256 impossible) | same | same |
-| Epochs | 60 max, patience 10 | 100 max, patience 25 | 60 max, patience 25 |
-| Loss | Cross-entropy | same | **+ LS 0.1 (impossible only)** |
-| Warmup | none | none | **500 steps (impossible only)** |
-| Gradient clipping | **none** | none | none |
-| Dropout | **none** | **0.1 (hard only)** | same |
-| Early stopping | **yes** (patience 10 on `val_acc`) | yes (patience 25) | yes (patience 25) |
+| Hyperparameter | v4.1.0 | v4.2.0 | v4.3.0 | v4.4.0 |
+|---|---|---|---|---|
+| Optimizer | AdamW (β = 0.9, 0.999) | same | same | same |
+| Learning rate | 1·10⁻³ (constant) | same | **cosine (impossible only)** | same |
+| Weight decay | 1·10⁻⁴ | **1·10⁻² (hard only)** | same | same |
+| Weight decay groups | — | **matrices / 1-D split** | same | same |
+| Batch size | 128 (256 impossible) | same | same | same |
+| Epochs | 60 max, patience 10 | 100 max, patience 25 | 60 max, patience 25 | same |
+| Loss | Cross-entropy | same | **+ LS 0.1 (impossible only)** | same |
+| Warmup | none | none | **500 steps (impossible only)** | same |
+| Gradient clipping | **none** | none | none | none |
+| Dropout | **none** | **0.1 (hard only)** | same | same |
+| Early stopping | **yes** (patience 10) | yes (patience 25) | yes (patience 25) | yes (patience 25) |
+| Seeds | 0 | 0 | 0 | **0, 1, 2, 3, 4** |
 
 **Why no gradient clipping?** Pre-norm residual networks train cleanly from epoch 1. This is a structural property, not a missing feature.
 
-**Why early stopping?** v4.1.0 added it and recovered +10 percentage points on both hard tasks, for free. **It remains the only mechanism in this project that reliably improves val acc.** See §"The only intervention that ever worked".
+**Why early stopping?** v4.1.0 added it and recovered +10 percentage points on both hard tasks, for free. **It remains the only mechanism in this project that reliably improves val acc.**
 
-**Why parameter groups in v4.2.0?** RMSNorm γ must not be decayed — shrinking it fights pre-norm's own stabilization. The optimizer gets two groups; the model's parameter count is unchanged.
+**Why parameter groups in v4.2.0?** RMSNorm γ must not be decayed — shrinking it fights pre-norm's own stabilization.
 
-**Why cosine + LS in v4.3.0?** To **falsify** the underfitting hypothesis from v4.1.0. They were predicted to raise val acc by +0.05–0.08. They did not. The result is in the falsification ledger.
+**Why cosine + LS in v4.3.0?** To **falsify** the underfitting hypothesis from v4.1.0. They were predicted to raise val acc by +0.05–0.08. They did not.
+
+**Why 5 seeds in v4.4.0?** To measure the variance floor that v4.2.0 and v4.3.0 assumed without measuring. The floor turned out to be larger than either release assumed, and every effect collapsed to zero.
 
 ---
 
@@ -717,6 +763,19 @@ print(len(groups[0]["params"]))   # 42  — weight matrices
 print(len(groups[1]["params"]))   # 21  — RMSNorm γ
 ```
 
+### Multi-seed run
+
+```python
+from zkash.multiseed import run_seeds, aggregate
+from zkash.utils import load_config
+
+cfg = load_config("configs/zkash_10m_hard.yaml")
+results = run_seeds(cfg, seeds=[0, 1, 2, 3, 4], verbose=False)
+agg = aggregate(results)
+
+print(f"val acc: {agg['val_acc']['mean']:.4f} ± {agg['val_acc']['std']:.4f}")
+```
+
 ---
 
 ## Tests
@@ -725,29 +784,13 @@ print(len(groups[1]["params"]))   # 21  — RMSNorm γ
 pytest -q
 ```
 
-| Test | What it checks |
+| Test file | What it checks |
 |---|---|
-| `test_param_count` | exact 10,000,896 budget |
-| `test_rmsnorm_shape` | RMSNorm preserves shape |
-| `test_rmsnorm_unit_rms` | output has unit RMS |
-| `test_residual_identity_at_zero` | zeroed block = identity |
-| `test_forward_shape` | output shape `(N, 8)` |
-| `test_forward_batch_sizes` | batch sizes 1, 8, 32, 128 |
-| `test_forward_dtype` | output dtype is float32 |
-| `test_forward_finite` | no NaNs or infs |
-| `test_backward_all_params_get_grad` | no dead parameters |
-| `test_state_dict_roundtrip` | serialization correctness |
-| `test_early_stopping_saves_best_state` | best-checkpoint behavior |
-| `test_patience_config_present` | all configs expose `patience` |
-| `test_two_groups_returned` | `build_param_groups` contract |
-| `test_no_parameter_appears_twice` | no double-counting in groups |
-| `test_group_union_covers_all_trainable_params` | 10,000,896 preserved |
-| `test_rmsnorm_params_are_not_decayed` | 21 norm tensors excluded |
-| `test_linear_weights_are_decayed` | 42 matrices included |
-| `test_decay_group_size_matches_budget` | group sizes exact |
-| `test_norm_weight_actually_untouched_by_decay` | semantic check |
+| `tests/test_model.py` | param count, RMSNorm, residual identity, forward shape/dtype/finiteness, backward grads, state-dict roundtrip, early stopping, config presence |
+| `tests/test_param_groups.py` | decay / no-decay split, group sizes, no double-counting, RMSNorm weights not decayed, AdamW accepts groups, semantic zero-grad check |
+| `tests/test_multiseed.py` | `_stats`, `aggregate`, `welch_sigma`, `format_summary`, `format_comparison`, `run_seeds` behavior, checkpoint suffixing, base-config immutability |
 
-**27 tests, ~4 s.**
+**44 tests, ~5 s.**
 
 ---
 
@@ -770,23 +813,28 @@ zkash10m/
 ├── src/
 │   └── zkash/
 │       ├── __init__.py
-│       ├── model.py        # RMSNorm, ResidualBlock, Zkash10M — one file
-│       ├── data.py         # synthetic Gaussian clouds
-│       ├── train.py        # training loop, early stopping, param groups, LR, LS
-│       ├── evaluate.py     # validation with checkpoint metadata
-│       └── utils.py        # seeds, device, config
+│       ├── model.py         # RMSNorm, ResidualBlock, Zkash10M — one file
+│       ├── data.py          # synthetic Gaussian clouds
+│       ├── train.py         # training loop, early stopping, param groups, LR, LS
+│       ├── evaluate.py      # validation with checkpoint metadata
+│       ├── multiseed.py     # v4.4.0 — N-seed runner
+│       ├── compare.py       # v4.4.0 — report comparator with σ verdict
+│       └── utils.py         # seeds, device, config
 ├── scripts/
 │   ├── train.sh
 │   ├── train_hard.sh
 │   ├── train_impossible.sh
-│   ├── sweep_hard.sh       # v4.2.0 2×2 ablation
-│   ├── sweep_impossible.sh # v4.3.0 four-run ablation
-│   ├── bayes_hard.py       # empirical Bayes for hard
-│   ├── bayes_impossible.py # empirical Bayes for impossible
+│   ├── sweep_hard.sh           # v4.2.0 2×2 ablation
+│   ├── sweep_impossible.sh     # v4.3.0 four-run ablation
+│   ├── multiseed_hard.sh       # v4.4.0 — 2 configs × 5 seeds
+│   ├── multiseed_impossible.sh # v4.4.0 — 4 configs × 5 seeds
+│   ├── bayes_hard.py           # empirical Bayes for hard
+│   ├── bayes_impossible.py     # empirical Bayes for impossible
 │   └── eval.sh
 ├── tests/
 │   ├── test_model.py
-│   └── test_param_groups.py
+│   ├── test_param_groups.py
+│   └── test_multiseed.py
 └── checkpoints/
     └── .gitkeep
 ```
@@ -802,22 +850,10 @@ The entire model — normalization, residual block, and the network itself — l
 | v1.0.0 | ✅ | Baseline, no regularization | documents failure |
 | v4.1.0 | ✅ | Early stopping + best checkpoint | **+0.10 on hard & impossible** |
 | v4.2.0 | ✅ | dropout + wd, `hard` | **−0.0116 on hard (falsified)** |
-| **v4.3.0** | ✅ | **cosine + LS on `impossible`; corrected Bayes formula** | **−0.0005 to −0.0011 (falsified)** |
-| v4.4.0 | 🔜 | Multi-seed runs (5 seeds) — mean ± std | quantifies variance floor |
+| v4.3.0 | ✅ | cosine + LS on `impossible`; corrected Bayes formula | **−0.0005 to −0.0011 (falsified)** |
+| **v4.4.0** | ✅ | **Multi-seed (5 seeds) — mean ± std** | **all effects σ < 0.30; std mispredicted 1.8×** |
 | v4.5.0 | 📅 | `data.py` label-noise fix + full re-run | consistency with corrected §5.1 |
-| v5.0.0 | 📅 | Zkash50M — depth 50, exact 50M params | next scale-up |
-
-### v4.4.0 predictions (falsifiable)
-
-**Multi-seed, 5 seeds:**
-
-| Task | Prediction |
-|---|---|
-| `hard` val acc, 5-seed mean ± std | **0.545 ± 0.008** |
-| `impossible` val acc, 5-seed mean ± std | **0.713 ± 0.003** |
-| Effect of v4.2.0 regularization on `hard` | inside 1σ of seed noise |
-
-If the std is larger than predicted, the "effects" in v4.2.0/v4.3.0 become even more clearly null. If smaller, some of the small effects may survive.
+| v5.0.0 | 📅 | Zkash100M — depth 100, exact 100M params | next scale-up |
 
 ### v4.5.0 predictions (falsifiable)
 
@@ -826,8 +862,8 @@ If the std is larger than predicted, the "effects" in v4.2.0/v4.3.0 become even 
 | Task | Prediction |
 |---|---|
 | `easy` | unchanged at 1.0000 |
-| `hard` | unchanged at 0.5458 (no label noise) |
-| `impossible` at `p = 0.2` | **drops by ~1.5 points to ~0.70**, because the true wrong rate rises from 0.175 to 0.20 |
+| `hard` | unchanged at 0.531 ± 0.014 (no label noise) |
+| `impossible` at `p = 0.2` | **drops by ~1.5 points to ~0.695**, because the true wrong rate rises from 0.175 to 0.20 |
 
 This will confirm the corrected Bayes formula quantitatively.
 
@@ -862,13 +898,13 @@ RMSNorm does the same job with half the operations and one parameter per dimensi
 Pre-norm keeps activation scale bounded at every layer, so gradients never spike. Warmup exists to prevent early-training instability — pre-norm prevents that instability structurally.
 
 **Why is val accuracy low on some tasks?**
-Because on those tasks, the model is **close to the Bayes ceiling** — and the ceiling is low. For `hard`, empirical Bayes is 0.5879; the best run reaches 0.5458. For `impossible`, corrected Bayes is 0.7142; the best run reaches 0.7128.
+Because on those tasks, the model is **close to the Bayes ceiling** — and the ceiling is low. For `hard`, empirical Bayes is 0.5879; the 5-seed mean is 0.5306. For `impossible`, corrected Bayes is 0.7142; the 5-seed mean is 0.7102.
 
-**Why did dropout + weight decay make `hard` *worse*?**
-Because `hard` is memorization-dominated and ceiling-bound. Regularization suppresses the (already-correct) signal fit along with the noise fit. Net effect: −0.0116 across two dataset sizes.
+**Why did dropout + weight decay make `hard` worse in v4.2.0 but better in v4.4.0?**
+Neither is real. v4.2.0 measured −0.0116 on seed 0. v4.4.0 on 5 seeds measures +0.0059 at σ = 0.30. Same zero, sampled differently.
 
 **Why didn't cosine LR + label smoothing help `impossible`?**
-Because `impossible` is also ceiling-bound. All four v4.3.0 runs land within ±0.0011 of baseline, and peak at epoch 5 — the same epoch as baseline. Cosine and LS change *how the model gets there*, not *where it stops*.
+Because `impossible` is also ceiling-bound. All four v4.3.0 variants, at 5 seeds each, land within ±0.0004 (σ < 0.20) of baseline. Cosine and LS change *how the model gets there*, not *where it stops*. The only non-null effect is that cosine compresses the peak-epoch distribution: 7.0 ± 3.54 → 4.4 ± 1.14.
 
 **Why did 4× more data not help `hard`?**
 The memorization transition happens at a fixed number of gradient steps (64–128), set by the task's signal-to-noise ratio, not by dataset size. More data makes the peak arrive earlier; it doesn't move the peak.
@@ -882,8 +918,11 @@ Because we save the **best** epoch, not the **last**. On `hard`, val peaks at 0.
 **Wasn't the v4.1.0 "impossible is underfitting" diagnosis correct?**
 No. It was based on an incorrect Bayes formula. The old formula gave 0.825 as the ceiling; the corrected formula gives 0.7135 (MC: 0.7142). The apparent 11.2-point "gap" was an artifact of the formula, not of the model.
 
+**Wasn't v4.4.0 just "more seeds, same conclusion"?**
+No — it changed three conclusions. (1) The direction of the `hard` regularization effect flipped sign (−0.0116 → +0.0059). (2) The seed variance itself was mispredicted by 1.8× in both directions. (3) Cosine LR was shown to have a real effect, just not on accuracy — it compresses the peak-epoch distribution by 3×.
+
 **Is this model production-ready?**
-No. It's an educational reference. It has documented failure modes on non-trivial tasks, and both v4.2.0 and v4.3.0 interventions produced null or negative results. But it *does* have a complete, correct Bayes analysis — which is more than most production models.
+No. It's an educational reference. It has documented failure modes on non-trivial tasks, and every training-loop intervention across v4.2.0–v4.4.0 produced null or negative results. But it *does* have a complete, correct Bayes analysis and a measured variance floor — which is more than most production models.
 
 ---
 
@@ -895,7 +934,7 @@ No. It's an educational reference. It has documented failure modes on non-trivia
   number      = {ZK-2025-04},
   institution = {Zkash Project},
   year        = {2025},
-  note        = {Version 4.3.0}
+  note        = {Version 4.4.0}
 }
 ```
 
