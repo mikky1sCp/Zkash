@@ -1,0 +1,29 @@
+model:
+  n_in: 64
+  n_out: 8
+  dim: 512
+  hidden: 486
+  depth: 20
+  p_drop: 0.0
+
+data:
+  n_samples: 262144
+  n_classes: 8
+  noise: 1.5
+  center_scale: 0.5
+  label_noise: 0.2
+  seed: 0
+
+train:
+  device: auto
+  epochs: 60
+  patience: 10
+  min_delta: 0.0
+  batch_size: 256
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  seed: 0
+  schedule: constant
+
+paths:
+  checkpoint: checkpoints/zkash10m_impossible.pt

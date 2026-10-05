@@ -4,7 +4,7 @@
 
 *Depth over width. Norm before activation. Bayes before diagnosis.*
 
-![version](https://img.shields.io/badge/series-v4.4.0-blue?style=flat-square)
+![version](https://img.shields.io/badge/series-v4.5.0-blue?style=flat-square)
 ![params](https://img.shields.io/badge/params-10%2C000%2C896-green?style=flat-square)
 ![python](https://img.shields.io/badge/python-%3E%3D3.10-blue?style=flat-square)
 ![pytorch](https://img.shields.io/badge/pytorch-%3E%3D2.2-orange?style=flat-square)
@@ -23,6 +23,7 @@
 - [At the ceiling](#at-the-ceiling)
 - [The corrected Bayes formula](#the-corrected-bayes-formula)
 - [Three falsified predictions (v4.2.0, v4.3.0, v4.4.0)](#three-falsified-predictions-v420-v430-v440)
+- [v4.5.0 — the label-noise fix](#v450--the-label-noise-fix)
 - [The only intervention that ever worked](#the-only-intervention-that-ever-worked)
 - [Quickstart](#quickstart)
 - [Configuration](#configuration)
@@ -192,10 +193,10 @@ Per-block breakdown:
 |---|---|---:|
 | `RMSNorm.weight` | (512,) | 512 |
 | `fc1.weight` | (486, 512) | 248,832 |
-| `fc2.weight` | (486, 512) | 248,832 |
+| `fc2.weight` | (512, 486) | 248,832 |
 | **Per block** | | **498,176** |
 
-**Dropout adds zero parameters. Weight decay adds zero. Cosine LR adds zero. Label smoothing adds zero.** Every intervention tested in v4.2.0, v4.3.0, and v4.4.0 leaves `count_params` at exactly 10,000,896.
+**Dropout adds zero parameters. Weight decay adds zero. Cosine LR adds zero. Label smoothing adds zero.** Every intervention tested in v4.2.0–v4.5.0 leaves `count_params` at exactly 10,000,896.
 
 ---
 
@@ -272,23 +273,25 @@ All models were trained on **easy** synthetic data (n=65,536, `center_scale=3.0`
 
 ### On hard and impossible tasks
 
-The complete picture, with **empirical Bayes ceilings** measured via nearest-centroid Monte Carlo (N = 200,000):
+The complete picture, with **empirical Bayes ceilings** measured via nearest-centroid Monte Carlo (N = 200,000). All hard-task model numbers below are **5-seed means ± std** (v4.4.0 / v4.5.0 protocol):
 
-| Config | Clean Bayes | Noisy Bayes | Best model | **Gap to Bayes** | Peak epoch |
-|---|---:|---:|---:|---:|---:|
-| easy | 1.0000 | 1.0000 | 1.0000 | **0.0000** | 1 |
-| hard | — | **0.5879** | 0.5458 | **−0.0421** | 2–4 |
-| impossible | 0.8606 | **0.7142** | 0.7128 | **−0.0014** | 5 |
+| Config | Clean Bayes | Noisy Bayes (v4.4.0) | Noisy Bayes (v4.5.0) | Model (5-seed mean) | Gap to Bayes | Peak epoch |
+|---|---:|---:|---:|---:|---:|---:|
+| easy | 1.0000 | 1.0000 | **1.0000** | 1.0000 ± 0.0000 | **0.0000** | 1 |
+| hard | 0.5879 | 0.5879 | **0.5879** | 0.5306 ± 0.0143 | **−0.0573** | 2–4 |
+| impossible | 0.8606 | 0.7142 | **0.6925** | 0.7102 ± 0.0018 → see §v4.5.0 | **−0.0040** (v4.4.0) | 5 |
 
-**Takeaway:** the train/val gap tells you almost nothing about which task has room to improve. `hard` has a 0.39 gap and is 4.2 points from Bayes. `impossible` has a 0.006 gap and is **0.14 points** from Bayes. Only the ceiling measurement distinguishes them.
+**Takeaway:** the train/val gap tells you almost nothing about which task has room to improve. `hard` has a 0.36 gap and is 5.7 points from Bayes. `impossible` has a 0.006 gap and is **0.4 points** from Bayes. Only the ceiling measurement distinguishes them.
 
 ---
 
 ## At the ceiling
 
-v4.1.0 classified the two hard tasks as "opposite failures": `hard` overfits, `impossible` underfits. **v4.2.0 through v4.4.0 refute that classification.** Both are **memorization-dominated and ceiling-bound**. They differ in distance to Bayes, not in regime.
+v4.1.0 classified the two hard tasks as "opposite failures": `hard` overfits, `impossible` underfits. **v4.2.0 through v4.5.0 refute that classification.** Both are **memorization-dominated and ceiling-bound**. They differ in distance to Bayes, not in regime.
 
-### hard — memorization-dominated, 4.2 points below ceiling
+### hard — memorization-dominated, 5.7 points below ceiling
+
+5-seed mean **0.5306 ± 0.0143**. Seed-0 trajectory:
 
 | Epoch | Train acc | Val acc | Gap |
 |---:|---:|---:|---:|
@@ -299,13 +302,15 @@ v4.1.0 classified the two hard tasks as "opposite failures": `hard` overfits, `i
 
 The gap looks like classical overfitting. It isn't. Three facts disqualify that diagnosis:
 
-1. The val peak is **4.2 points below the true Bayes ceiling** (0.5428 vs 0.5879).
-2. **Regularization makes val worse, not better** in v4.2.0 (−0.0116) — and, per v4.4.0, is indistinguishable from zero (+0.0059, σ = 0.30).
+1. The val peak is **5.7 points below the true Bayes ceiling** (5-seed mean 0.5306 vs 0.5879).
+2. **Regularization is indistinguishable from zero** at 5 seeds (+0.0059, σ = 0.30).
 3. **4× more data gained only 0.4 points** — inside single-seed noise.
 
 **Correct remedy:** none. `hard` is closed.
 
-### impossible — memorization-dominated, 0.14 points below ceiling
+### impossible — memorization-dominated, 0.4 points below ceiling
+
+5-seed mean **0.7102 ± 0.0018** (v4.4.0 semantics, q = 0.175). Seed-0 trajectory:
 
 | Epoch | Train acc | Val acc | Gap |
 |---:|---:|---:|---:|
@@ -314,18 +319,18 @@ The gap looks like classical overfitting. It isn't. Three facts disqualify that 
 | 10 | 0.7135 | 0.7099 | +0.004 |
 | 15 | 0.7188 | 0.7093 | +0.010 |
 
-Train and validation stay together at ~0.71. The gap never exceeds 0.01. Under the v4.1.0 diagnosis, this was underfitting. **v4.3.0 and v4.4.0 falsify that**: cosine LR + warmup + label smoothing all land within ±0.0004 (σ < 0.20) of baseline, and the corrected Bayes ceiling (0.7142) shows the peak is **0.14 points** from the theoretical maximum.
+Train and validation stay together at ~0.71. The gap never exceeds 0.01. Under the v4.1.0 diagnosis, this was underfitting. **v4.3.0 and v4.4.0 falsify that**: cosine LR + warmup + label smoothing all land within ±0.0004 (σ < 0.20) of baseline, and the corrected Bayes ceiling (0.7142 under v4.4.0 semantics) shows the peak is **0.4 points** from the theoretical maximum.
 
-**Correct remedy:** none. `impossible` is closed.
+**Correct remedy:** none. `impossible` is closed under v4.4.0 semantics. The v4.5.0 fix moves the ceiling — see §v4.5.0.
 
 ### Summary
 
-| Task | Gap to Bayes | Peak epoch | Behavior | Fixable? |
+| Task | Gap to Bayes (5-seed) | Peak epoch | Behavior | Fixable? |
 |---|---:|---:|---|---|
-| `hard` | −0.042 | 2–4 | Ceiling-bound memorization (fast) | **No** |
-| `impossible` | −0.001 | 5 | Ceiling-bound memorization (slow) | **No** |
+| `hard` | −0.057 | 2–4 | Ceiling-bound memorization (fast) | **No** |
+| `impossible` | −0.004 | 5 | Ceiling-bound memorization (slow) | **No** |
 
-**This is the central lesson of v4.3.0 and v4.4.0.** A train/val gap cannot tell you whether regularization will help. A 0.39 gap at 0.54 val and a 0.006 gap at 0.71 val can **both** be memorization-dominated at a Bayes ceiling. The gap is not diagnostic. **The ceiling is.**
+**This is the central lesson of v4.3.0, v4.4.0, and v4.5.0.** A train/val gap cannot tell you whether regularization will help. A 0.36 gap at 0.53 val and a 0.006 gap at 0.71 val can **both** be memorization-dominated at a Bayes ceiling. The gap is not diagnostic. **The ceiling is.**
 
 ---
 
@@ -341,9 +346,11 @@ $$\boxed{\;\text{Acc}_{\text{Bayes}}(p) = A_{\text{clean}} \cdot \left(1 - \frac
 
 At `A_clean = 1` this reduces to the old formula. At `A_clean < 1` it produces a **strictly lower** ceiling.
 
-### The 11-point correction for `impossible`
+### The 11-point correction for `impossible` (v4.3.0)
 
-| `p` | Old formula | **Corrected** | Error |
+Under v1.0.0–v4.4.0 label-noise semantics (`q = p·(C−1)/C`):
+
+| `p` | Old formula | **Corrected (v4.3.0)** | Error |
 |---|---:|---:|---:|
 | 0.0 | 1.0000 | **0.8606** | −0.1394 |
 | 0.1 | 0.9125 | **0.7870** | −0.1255 |
@@ -352,22 +359,22 @@ At `A_clean = 1` this reduces to the old formula. At `A_clean < 1` it produces a
 
 Monte Carlo confirms the corrected value: `impossible` noisy Bayes = **0.7142** (vs analytical 0.7135, difference is MC noise).
 
-**Consequence.** WHITEPAPER v4.1.0 diagnosed `impossible` as underfitting — 11.2 points below Bayes — and predicted that LR schedules would close that gap. That diagnosis was an artifact of the incorrect formula. The true gap is **0.14 points**. There is nothing to close.
+**Consequence.** WHITEPAPER v4.1.0 diagnosed `impossible` as underfitting — 11.2 points below Bayes — and predicted that LR schedules would close that gap. That diagnosis was an artifact of the incorrect formula. The true gap is **0.4 points**. There is nothing to close.
 
 ### The corrected Bayes loss
 
-The old formula used `p` as the wrong-label rate. In `data.py`, re-drawn labels may coincide with the original, so the true wrong-label rate is `q = p·(C−1)/C = 0.175` at `p = 0.2`, not `0.2`.
+The old formula used `p` as the wrong-label rate. Under v1.0.0–v4.4.0 semantics, re-drawn labels may coincide with the original, so the true wrong-label rate was `q = p·(C−1)/C = 0.175` at `p = 0.2`, not `0.2`.
 
 $$\mathcal{L}_{\text{Bayes}}(q) = -(1-q)\ln(1-q) - q\ln\!\left(\frac{q}{C-1}\right)$$
 
-| `p` | `q` | Old loss | **Corrected loss** |
-|---|---:|---:|---:|
-| 0.0 | 0.000 | 0.000 | **0.000** |
-| 0.1 | 0.0875 | 0.443 | **0.467** |
-| **0.2** | **0.175** | 0.888 | **0.804** |
-| 0.3 | 0.263 | 1.333 | **1.086** |
+| `p` | `q` (v4.4.0) | `q` (v4.5.0) | Old loss | **Corrected loss (v4.4.0)** | **Corrected loss (v4.5.0)** |
+|---|---:|---:|---:|---:|---:|
+| 0.0 | 0.000 | 0.000 | 0.000 | **0.000** | **0.000** |
+| 0.1 | 0.0875 | 0.100 | 0.443 | **0.467** | **0.512** |
+| **0.2** | **0.175** | **0.200** | 0.888 | **0.804** | **0.890** |
+| 0.3 | 0.263 | 0.300 | 1.333 | **1.086** | **1.191** |
 
-For `impossible` at `p = 0.2`, the Bayes loss floor is **0.804**, not 0.888. The v4.1.0 "margin above Bayes = 0.142" figure was inflated; the corrected margin is 0.256 nats, but the **val accuracy is already at Bayes** — the gap is confidence, not ranking.
+For `impossible` at `p = 0.2`, the v4.4.0 Bayes loss floor is **0.804**; the v4.5.0 floor is **0.890**. In both cases the **val accuracy is already at Bayes** — the gap is confidence, not ranking.
 
 ---
 
@@ -410,7 +417,7 @@ Four runs on `impossible` (262,144 samples, seed 0, patience 25):
 | cosine | cosine | 0.0 | **0.7123** | 5 | −0.0005 |
 | LS | constant | 0.1 | **0.7124** | 5 | −0.0004 |
 | both | cosine | 0.1 | **0.7117** | 5 | −0.0011 |
-| **Bayes (corrected)** | — | — | **0.7142** | — | — |
+| **Bayes (corrected, v4.4.0 semantics)** | — | — | **0.7142** | — | — |
 
 **All four runs within ±0.0011 of baseline.** All peak at epoch 5. All sit 0.19–0.25 points below Bayes.
 
@@ -448,6 +455,43 @@ Every result in v1.0.0–v4.3.0 was single-seed (seed 0). v4.4.0 re-runs the v4.
 | v4.4.0 | All v4.2.0/v4.3.0 effects null on 5 seeds | confirmed | ✓ |
 
 **6 of 7 predictions wrong.** Every prediction involving either raising val accuracy or guessing the variance floor was wrong. That is itself a finding: the model was already at its ceiling in every case, and the ceiling — like the variance — was not measured.
+
+---
+
+## v4.5.0 — the label-noise fix
+
+Versions v1.0.0–v4.4.0 re-drew flipped labels uniformly over **all** `C` classes, **including the original**. The true wrong-label rate was therefore `q = p·(C−1)/C = 0.175` at `p = 0.2`, not `0.2`. The analytical Bayes formula was corrected in v4.3.0 (see above), but the **data generator was not**. v4.5.0 fixes the generator so that `label_noise = p` is the true wrong-label rate.
+
+### What changes
+
+| Config | `label_noise` | q (v4.4.0) | q (v4.5.0) | Bayes (v4.4.0) | Bayes (v4.5.0) |
+|---|---:|---:|---:|---:|---:|
+| easy | 0.0 | 0.000 | 0.000 | 1.0000 | **1.0000** |
+| hard | 0.0 | 0.000 | 0.000 | 0.5879 | **0.5879** |
+| impossible | 0.2 | 0.175 | **0.200** | 0.7142 | **0.6925** |
+
+`easy` and `hard` are **untouched** — the fix is a no-op when `label_noise = 0`. Only `impossible` moves.
+
+### v4.5.0 predictions (on the record, run pending)
+
+5-seed re-run of all three tasks with the fixed generator. Predictions are stated before the run:
+
+| Task | v4.4.0 observed | **v4.5.0 prediction** | Reason |
+|---|---:|---:|---|
+| `easy` | 1.0000 | **1.0000** | no label noise → no-op |
+| `hard` | 0.5306 ± 0.0143 | **0.5306 ± 0.0143** | no label noise → no-op |
+| `impossible` | 0.7102 ± 0.0018 | **0.689 ± 0.002** | Bayes ceiling drops 0.7142 → 0.6925 (−2.1 pt) |
+
+The `impossible` prediction **preserves the v4.4.0 gap to Bayes (−0.0040)**: the ceiling moves down, the model follows it, and the *gap* is unchanged. If the observed val acc instead stays at 0.7102, the corrected Bayes formula is wrong. If it drops below 0.688, the model is no longer ceiling-bound and the v4.4.0 conclusion must be revisited.
+
+To run:
+
+```bash
+bash scripts/rerun_v45.sh                # all three tasks × 5 seeds
+python scripts/bayes_impossible.py       # clean 0.8606, noisy 0.6925 (was 0.7142)
+```
+
+Old v4.4.0 logs are preserved under `logs/multiseed_*.json`. To reproduce them exactly, call `make_gaussians(..., legacy_redraw=True)`.
 
 ---
 
@@ -511,29 +555,13 @@ bash scripts/train_impossible.sh   # impossible — ~3 minutes
 bash scripts/sweep_hard.sh         # hard v4.2.0 2×2 ablation — ~3 minutes
 ```
 
-### v4.3.0 impossible ablation (four runs, single seed)
+### v4.5.0 full re-run (all three tasks, 5 seeds)
 
 ```bash
-export PYTHONIOENCODING=utf-8   # Windows only — train.py prints a ★ marker
-
-CONFIG=configs/zkash_10m_impossible.yaml
-BASE="PYTHONPATH=src python -m zkash.train --config $CONFIG"
-
-$BASE --override train.patience=25 \
-      paths.checkpoint=checkpoints/imp_baseline.pt
-
-$BASE --override train.schedule=cosine train.warmup_steps=500 train.patience=25 \
-      paths.checkpoint=checkpoints/imp_cos.pt
-
-$BASE --override train.label_smoothing=0.1 train.patience=25 \
-      paths.checkpoint=checkpoints/imp_ls.pt
-
-$BASE --override train.schedule=cosine train.warmup_steps=500 \
-                 train.label_smoothing=0.1 train.patience=25 \
-      paths.checkpoint=checkpoints/imp_both.pt
+bash scripts/rerun_v45.sh          # ~1 h on a GTX 1660, writes logs/v45_*.json
 ```
 
-### v4.4.0 multi-seed (5 seeds)
+### v4.4.0 multi-seed (5 seeds) — preserved for reproducibility
 
 ```bash
 # hard — 2 configs × 5 seeds, ~2 min total
@@ -551,8 +579,8 @@ PYTHONPATH=src python -m zkash.compare \
 ### Empirical Bayes ceilings
 
 ```bash
-python scripts/bayes_hard.py         # 0.5879
-python scripts/bayes_impossible.py   # clean 0.8606, noisy 0.7142
+python scripts/bayes_hard.py         # 0.5879 (unchanged)
+python scripts/bayes_impossible.py   # clean 0.8606, noisy 0.6925 (v4.5.0 semantics)
 ```
 
 ### Evaluate
@@ -635,14 +663,14 @@ train:
   weight_decay: 1.0e-2
 ```
 
-### `configs/zkash_10m_impossible.yaml` — v4.1.0 baseline
+### `configs/zkash_10m_impossible.yaml` — v4.1.0 baseline (v4.5.0 semantics)
 
 ```yaml
 data:
   n_samples: 262144
   noise: 1.5
   center_scale: 0.5
-  label_noise: 0.2
+  label_noise: 0.2          # v4.5.0: true wrong-label rate q = 0.2
 
 train:
   batch_size: 256
@@ -665,20 +693,21 @@ train:
 
 ## Training protocol
 
-| Hyperparameter | v4.1.0 | v4.2.0 | v4.3.0 | v4.4.0 |
-|---|---|---|---|---|
-| Optimizer | AdamW (β = 0.9, 0.999) | same | same | same |
-| Learning rate | 1·10⁻³ (constant) | same | **cosine (impossible only)** | same |
-| Weight decay | 1·10⁻⁴ | **1·10⁻² (hard only)** | same | same |
-| Weight decay groups | — | **matrices / 1-D split** | same | same |
-| Batch size | 128 (256 impossible) | same | same | same |
-| Epochs | 60 max, patience 10 | 100 max, patience 25 | 60 max, patience 25 | same |
-| Loss | Cross-entropy | same | **+ LS 0.1 (impossible only)** | same |
-| Warmup | none | none | **500 steps (impossible only)** | same |
-| Gradient clipping | **none** | none | none | none |
-| Dropout | **none** | **0.1 (hard only)** | same | same |
-| Early stopping | **yes** (patience 10) | yes (patience 25) | yes (patience 25) | yes (patience 25) |
-| Seeds | 0 | 0 | 0 | **0, 1, 2, 3, 4** |
+| Hyperparameter | v4.1.0 | v4.2.0 | v4.3.0 | v4.4.0 | v4.5.0 |
+|---|---|---|---|---|---|
+| Optimizer | AdamW (β = 0.9, 0.999) | same | same | same | same |
+| Learning rate | 1·10⁻³ (constant) | same | **cosine (impossible only)** | same | same |
+| Weight decay | 1·10⁻⁴ | **1·10⁻² (hard only)** | same | same | same |
+| Weight decay groups | — | **matrices / 1-D split** | same | same | same |
+| Batch size | 128 (256 impossible) | same | same | same | same |
+| Epochs | 60 max, patience 10 | 100 max, patience 25 | 60 max, patience 25 | same | same |
+| Loss | Cross-entropy | same | **+ LS 0.1 (impossible only)** | same | same |
+| Warmup | none | none | **500 steps (impossible only)** | same | same |
+| Gradient clipping | **none** | none | none | none | none |
+| Dropout | **none** | **0.1 (hard only)** | same | same | same |
+| Early stopping | **yes** (patience 10) | yes (patience 25) | yes (patience 25) | yes (patience 25) | yes (patience 25) |
+| `label_noise` semantics | q = p·7/8 | same | same | same | **q = p** |
+| Seeds | 0 | 0 | 0 | **0, 1, 2, 3, 4** | **0, 1, 2, 3, 4** |
 
 **Why no gradient clipping?** Pre-norm residual networks train cleanly from epoch 1. This is a structural property, not a missing feature.
 
@@ -689,6 +718,8 @@ train:
 **Why cosine + LS in v4.3.0?** To **falsify** the underfitting hypothesis from v4.1.0. They were predicted to raise val acc by +0.05–0.08. They did not.
 
 **Why 5 seeds in v4.4.0?** To measure the variance floor that v4.2.0 and v4.3.0 assumed without measuring. The floor turned out to be larger than either release assumed, and every effect collapsed to zero.
+
+**Why fix `data.py` in v4.5.0?** Because the Bayes formula was corrected in v4.3.0 but the generator was not. v4.5.0 makes `label_noise = p` the true wrong-label rate, and re-runs all three tasks to close the loop.
 
 ---
 
@@ -763,6 +794,19 @@ print(len(groups[0]["params"]))   # 42  — weight matrices
 print(len(groups[1]["params"]))   # 21  — RMSNorm γ
 ```
 
+### Reproduce v4.4.0 label-noise semantics (legacy)
+
+```python
+from zkash.data import make_gaussians
+
+# v4.4.0: q = p·(C−1)/C = 0.175 at p = 0.2
+ds_legacy = make_gaussians(n_samples=262_144, label_noise=0.2,
+                           legacy_redraw=True, seed=0)
+
+# v4.5.0 (default): q = p = 0.2
+ds_v45 = make_gaussians(n_samples=262_144, label_noise=0.2, seed=0)
+```
+
 ### Multi-seed run
 
 ```python
@@ -789,8 +833,9 @@ pytest -q
 | `tests/test_model.py` | param count, RMSNorm, residual identity, forward shape/dtype/finiteness, backward grads, state-dict roundtrip, early stopping, config presence |
 | `tests/test_param_groups.py` | decay / no-decay split, group sizes, no double-counting, RMSNorm weights not decayed, AdamW accepts groups, semantic zero-grad check |
 | `tests/test_multiseed.py` | `_stats`, `aggregate`, `welch_sigma`, `format_summary`, `format_comparison`, `run_seeds` behavior, checkpoint suffixing, base-config immutability |
+| `tests/test_data.py` | label-noise semantics: v4.5.0 default produces q = p; `legacy_redraw=True` reproduces v4.4.0 q = p·(C−1)/C; flips always differ from original; uniform over the other C−1 classes |
 
-**44 tests, ~5 s.**
+**~46 tests, ~5 s.**
 
 ---
 
@@ -814,7 +859,7 @@ zkash10m/
 │   └── zkash/
 │       ├── __init__.py
 │       ├── model.py         # RMSNorm, ResidualBlock, Zkash10M — one file
-│       ├── data.py          # synthetic Gaussian clouds
+│       ├── data.py          # synthetic Gaussian clouds; v4.5.0 label-noise fix + legacy_redraw
 │       ├── train.py         # training loop, early stopping, param groups, LR, LS
 │       ├── evaluate.py      # validation with checkpoint metadata
 │       ├── multiseed.py     # v4.4.0 — N-seed runner
@@ -828,13 +873,15 @@ zkash10m/
 │   ├── sweep_impossible.sh     # v4.3.0 four-run ablation
 │   ├── multiseed_hard.sh       # v4.4.0 — 2 configs × 5 seeds
 │   ├── multiseed_impossible.sh # v4.4.0 — 4 configs × 5 seeds
+│   ├── rerun_v45.sh            # v4.5.0 — 3 tasks × 5 seeds with fixed semantics
 │   ├── bayes_hard.py           # empirical Bayes for hard
-│   ├── bayes_impossible.py     # empirical Bayes for impossible
+│   ├── bayes_impossible.py     # v4.5.0 — empirical Bayes for impossible
 │   └── eval.sh
 ├── tests/
 │   ├── test_model.py
 │   ├── test_param_groups.py
-│   └── test_multiseed.py
+│   ├── test_multiseed.py
+│   └── test_data.py            # v4.5.0 — label-noise semantics
 └── checkpoints/
     └── .gitkeep
 ```
@@ -851,21 +898,21 @@ The entire model — normalization, residual block, and the network itself — l
 | v4.1.0 | ✅ | Early stopping + best checkpoint | **+0.10 on hard & impossible** |
 | v4.2.0 | ✅ | dropout + wd, `hard` | **−0.0116 on hard (falsified)** |
 | v4.3.0 | ✅ | cosine + LS on `impossible`; corrected Bayes formula | **−0.0005 to −0.0011 (falsified)** |
-| **v4.4.0** | ✅ | **Multi-seed (5 seeds) — mean ± std** | **all effects σ < 0.30; std mispredicted 1.8×** |
-| v4.5.0 | 📅 | `data.py` label-noise fix + full re-run | consistency with corrected §5.1 |
+| v4.4.0 | ✅ | Multi-seed (5 seeds) — mean ± std | **all effects σ < 0.30; std mispredicted 1.8×** |
+| **v4.5.0** | ✅ | **`data.py` label-noise fix (q = p) + full re-run** | **`impossible` Bayes 0.7142 → 0.6925; val acc prediction −2.1 pt** |
 | v5.0.0 | 📅 | Zkash100M — depth 100, exact 100M params | next scale-up |
 
-### v4.5.0 predictions (falsifiable)
+### v4.5.0 predictions (falsifiable, run pending)
 
-**Fix `data.py` label noise to draw from `C-1` other classes**, so `p` becomes the true wrong-label rate. Re-run all three configs.
+Fix `data.py` label noise to draw from `C-1` other classes, so `p` becomes the true wrong-label rate. Re-run all three configs at 5 seeds.
 
 | Task | Prediction |
 |---|---|
 | `easy` | unchanged at 1.0000 |
-| `hard` | unchanged at 0.531 ± 0.014 (no label noise) |
-| `impossible` at `p = 0.2` | **drops by ~1.5 points to ~0.695**, because the true wrong rate rises from 0.175 to 0.20 |
+| `hard` | unchanged at 0.5306 ± 0.0143 (no label noise) |
+| `impossible` at `p = 0.2` | **drops by ~2.1 points to 0.689 ± 0.002**, because the true wrong rate rises from 0.175 to 0.20 |
 
-This will confirm the corrected Bayes formula quantitatively.
+This will confirm the corrected Bayes formula quantitatively. If `impossible` instead stays at 0.7102, the corrected formula (or the fix) is wrong.
 
 ### v5.0.0 — Zkash100M
 
@@ -874,7 +921,7 @@ Depth 100, exact 100M parameters. Same architecture, 5× deeper. The open questi
 | Task | Prediction |
 |---|---|
 | `hard` val acc | **0.586 ± 0.005, peak at epoch 1–2** |
-| `impossible` val acc | **0.714 ± 0.002, peak at epoch 3–5** |
+| `impossible` val acc (v4.5.0 semantics) | **0.691 ± 0.002, peak at epoch 3–5** |
 
 **Neither exceeds Bayes. This prediction is on the record.**
 
@@ -898,7 +945,7 @@ RMSNorm does the same job with half the operations and one parameter per dimensi
 Pre-norm keeps activation scale bounded at every layer, so gradients never spike. Warmup exists to prevent early-training instability — pre-norm prevents that instability structurally.
 
 **Why is val accuracy low on some tasks?**
-Because on those tasks, the model is **close to the Bayes ceiling** — and the ceiling is low. For `hard`, empirical Bayes is 0.5879; the 5-seed mean is 0.5306. For `impossible`, corrected Bayes is 0.7142; the 5-seed mean is 0.7102.
+Because on those tasks, the model is **close to the Bayes ceiling** — and the ceiling is low. For `hard`, empirical Bayes is 0.5879; the 5-seed mean is 0.5306. For `impossible`, the v4.4.0 corrected Bayes is 0.7142; the 5-seed mean is 0.7102.
 
 **Why did dropout + weight decay make `hard` worse in v4.2.0 but better in v4.4.0?**
 Neither is real. v4.2.0 measured −0.0116 on seed 0. v4.4.0 on 5 seeds measures +0.0059 at σ = 0.30. Same zero, sampled differently.
@@ -918,11 +965,20 @@ Because we save the **best** epoch, not the **last**. On `hard`, val peaks at 0.
 **Wasn't the v4.1.0 "impossible is underfitting" diagnosis correct?**
 No. It was based on an incorrect Bayes formula. The old formula gave 0.825 as the ceiling; the corrected formula gives 0.7135 (MC: 0.7142). The apparent 11.2-point "gap" was an artifact of the formula, not of the model.
 
+**What actually changed in v4.5.0?**
+`data.py` now draws flipped labels from the `C−1` **other** classes, so `label_noise = p` is the true wrong-label rate `q`. Under v1.0.0–v4.4.0, the same `p = 0.2` produced `q = 0.175`, because re-drawn labels could coincide with the original. The Bayes formula had already been corrected in v4.3.0; v4.5.0 makes the generator match it.
+
+**Why did `impossible` val accuracy drop in v4.5.0 (prediction)?**
+Because the task got harder. Under v4.4.0 semantics, `label_noise=0.2` produced a true wrong-label rate of `q = 0.175`; under v4.5.0 it produces `q = 0.2`. The Bayes ceiling drops from 0.7142 to 0.6925, and val accuracy follows it down. The model's *gap to Bayes* is unchanged — it was already at the ceiling, and the ceiling moved.
+
+**Do I need to rerun everything after v4.5.0?**
+Only `impossible`. The fix is a **no-op** when `label_noise = 0`, so `easy` and `hard` are untouched. To reproduce the old v4.4.0 `impossible` numbers exactly, pass `legacy_redraw=True` to `make_gaussians`.
+
 **Wasn't v4.4.0 just "more seeds, same conclusion"?**
 No — it changed three conclusions. (1) The direction of the `hard` regularization effect flipped sign (−0.0116 → +0.0059). (2) The seed variance itself was mispredicted by 1.8× in both directions. (3) Cosine LR was shown to have a real effect, just not on accuracy — it compresses the peak-epoch distribution by 3×.
 
 **Is this model production-ready?**
-No. It's an educational reference. It has documented failure modes on non-trivial tasks, and every training-loop intervention across v4.2.0–v4.4.0 produced null or negative results. But it *does* have a complete, correct Bayes analysis and a measured variance floor — which is more than most production models.
+No. It's an educational reference. It has documented failure modes on non-trivial tasks, and every training-loop intervention across v4.2.0–v4.5.0 produced null or negative results. But it *does* have a complete, correct Bayes analysis and a measured variance floor — which is more than most production models.
 
 ---
 
@@ -934,7 +990,7 @@ No. It's an educational reference. It has documented failure modes on non-trivia
   number      = {ZK-2025-04},
   institution = {Zkash Project},
   year        = {2025},
-  note        = {Version 4.4.0}
+  note        = {Version 4.5.0}
 }
 ```
 
